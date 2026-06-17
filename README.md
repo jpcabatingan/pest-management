@@ -1,3 +1,13 @@
+# Standalone Pest Management Model
+
+**Author:** Joanne Maryz Cabatingan  
+**Role:** Computer Science Intern at ACROSS  
+**Objective:** Model pest dynamics and management strategies in a standalone agent-based simulation prior to integration with the main STAR-FARM model.
+
+Detailed documentation on Pest Dynamics based on Literature, Assessment of current STAR-FARM models, and Standalone Model Design can be found in the working document.
+
+---
+
 ## Overview
 
 This repository contains a modular agent-based simulation built in GAMA (GAma Modeling Language) to explore, calibrate, and validate crop-pest-farmer interactions. It acts as an isolated sandbox for testing Brown Planthopper (BPH) infestation dynamics and pesticide management policies before integration with the main STAR-FARM model.
@@ -68,3 +78,18 @@ Baseline yield loss (none strategy): **43.75%**. Conservation check: (grain + pe
 | Threshold | 0.73 t/ha | 0.39 | 0.23 |
 
 Resistance at center plot by end of season 3: **0.30** (both calendar and threshold, 5 sprays/season). Grid-mean resistance: calendar 0.300 vs threshold 0.033 — targeted spraying contains resistance to one plot out of nine.
+
+---
+
+## How to Run the Simulation
+
+1. **Import the Project:**
+   * Open the GAMA Platform (v1.8.2 or 1.9+).
+   * Select `File -> Import -> Projects... -> Existing Projects into Workspace`.
+   * Choose the `Pest-Management-Module` folder in this repository.
+2. **Run Experiments:**
+   * Open any model file in the `models/` directory:
+     * `PestModule_Layer1.gaml`
+     * `PestModule_Layer2.gaml`
+     * `PestModule_Layer3.gaml`
+   * Click the `experiment` run it.
