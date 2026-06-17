@@ -1,0 +1,243 @@
+  Plot 0,0 harvested. Grain=3.68t/ha. PestLoss=0.33t/ha. Sprays=0. Revenue=11029.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.43t/ha. PestLoss=0.58t/ha. Sprays=0. Revenue=10297.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.68t/ha. PestLoss=0.33t/ha. Sprays=0. Revenue=11029.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.43t/ha. PestLoss=0.58t/ha. Sprays=0. Revenue=10297.0. resist=0.0
+  Plot 1,1 harvested. Grain=2.83t/ha. PestLoss=1.18t/ha. Sprays=0. Revenue=8476.0. resist=0.0
+  Plot 2,1 harvested. Grain=3.43t/ha. PestLoss=0.58t/ha. Sprays=0. Revenue=10297.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.68t/ha. PestLoss=0.33t/ha. Sprays=0. Revenue=11029.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.43t/ha. PestLoss=0.58t/ha. Sprays=0. Revenue=10297.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.68t/ha. PestLoss=0.33t/ha. Sprays=0. Revenue=11029.0. resist=0.0
+Day 76 | Season 1 harvested. Strategy=none. Money=98779.0.
+  Plot 0,0 harvested. Grain=3.69t/ha. PestLoss=0.31t/ha. Sprays=0. Revenue=11078.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.46t/ha. PestLoss=0.55t/ha. Sprays=0. Revenue=10379.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.69t/ha. PestLoss=0.31t/ha. Sprays=0. Revenue=11078.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.46t/ha. PestLoss=0.55t/ha. Sprays=0. Revenue=10379.0. resist=0.0
+  Plot 1,1 harvested. Grain=2.88t/ha. PestLoss=1.13t/ha. Sprays=0. Revenue=8631.0. resist=0.0
+  Plot 2,1 harvested. Grain=3.46t/ha. PestLoss=0.55t/ha. Sprays=0. Revenue=10379.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.69t/ha. PestLoss=0.31t/ha. Sprays=0. Revenue=11078.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.46t/ha. PestLoss=0.55t/ha. Sprays=0. Revenue=10379.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.69t/ha. PestLoss=0.31t/ha. Sprays=0. Revenue=11078.0. resist=0.0
+Day 152 | Season 2 harvested. Strategy=none. Money=193241.0.
+  Plot 0,0 harvested. Grain=3.66t/ha. PestLoss=0.34t/ha. Sprays=0. Revenue=10990.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.41t/ha. PestLoss=0.6t/ha. Sprays=0. Revenue=10234.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.66t/ha. PestLoss=0.34t/ha. Sprays=0. Revenue=10990.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.41t/ha. PestLoss=0.6t/ha. Sprays=0. Revenue=10234.0. resist=0.0
+  Plot 1,1 harvested. Grain=2.79t/ha. PestLoss=1.22t/ha. Sprays=0. Revenue=8360.0. resist=0.0
+  Plot 2,1 harvested. Grain=3.41t/ha. PestLoss=0.6t/ha. Sprays=0. Revenue=10234.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.66t/ha. PestLoss=0.34t/ha. Sprays=0. Revenue=10990.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.41t/ha. PestLoss=0.6t/ha. Sprays=0. Revenue=10234.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.66t/ha. PestLoss=0.34t/ha. Sprays=0. Revenue=10990.0. resist=0.0
+Day 228 | Season 3 harvested. Strategy=none. Money=286499.0.
+All 3 season(s) complete. Strategy: none
+  -> Spray on plot 0,0 day 14. before=0.045 after=0.009 realized_eff=0.8 resist=0.02
+  -> Spray on plot 1,0 day 14. before=0.097 after=0.019 realized_eff=0.8 resist=0.02
+  -> Spray on plot 2,0 day 14. before=0.045 after=0.009 realized_eff=0.8 resist=0.02
+  -> Spray on plot 0,1 day 14. before=0.097 after=0.019 realized_eff=0.8 resist=0.02
+  -> Spray on plot 1,1 day 14. before=0.263 after=0.053 realized_eff=0.8 resist=0.02
+  -> Spray on plot 2,1 day 14. before=0.097 after=0.019 realized_eff=0.8 resist=0.02
+  -> Spray on plot 0,2 day 14. before=0.045 after=0.009 realized_eff=0.8 resist=0.02
+  -> Spray on plot 1,2 day 14. before=0.097 after=0.019 realized_eff=0.8 resist=0.02
+  -> Spray on plot 2,2 day 14. before=0.045 after=0.009 realized_eff=0.8 resist=0.02
+  -> Spray on plot 0,0 day 28. before=0.025 after=0.005 realized_eff=0.784 resist=0.04
+  -> Spray on plot 1,0 day 28. before=0.055 after=0.012 realized_eff=0.784 resist=0.04
+  -> Spray on plot 2,0 day 28. before=0.025 after=0.005 realized_eff=0.784 resist=0.04
+  -> Spray on plot 0,1 day 28. before=0.055 after=0.012 realized_eff=0.784 resist=0.04
+  -> Spray on plot 1,1 day 28. before=0.178 after=0.038 realized_eff=0.784 resist=0.04
+  -> Spray on plot 2,1 day 28. before=0.055 after=0.012 realized_eff=0.784 resist=0.04
+  -> Spray on plot 0,2 day 28. before=0.025 after=0.005 realized_eff=0.784 resist=0.04
+  -> Spray on plot 1,2 day 28. before=0.055 after=0.012 realized_eff=0.784 resist=0.04
+  -> Spray on plot 2,2 day 28. before=0.025 after=0.005 realized_eff=0.784 resist=0.04
+  -> Spray on plot 0,0 day 42. before=0.022 after=0.005 realized_eff=0.768 resist=0.06
+  -> Spray on plot 1,0 day 42. before=0.053 after=0.012 realized_eff=0.768 resist=0.06
+  -> Spray on plot 2,0 day 42. before=0.022 after=0.005 realized_eff=0.768 resist=0.06
+  -> Spray on plot 0,1 day 42. before=0.053 after=0.012 realized_eff=0.768 resist=0.06
+  -> Spray on plot 1,1 day 42. before=0.195 after=0.045 realized_eff=0.768 resist=0.06
+  -> Spray on plot 2,1 day 42. before=0.053 after=0.012 realized_eff=0.768 resist=0.06
+  -> Spray on plot 0,2 day 42. before=0.022 after=0.005 realized_eff=0.768 resist=0.06
+  -> Spray on plot 1,2 day 42. before=0.053 after=0.012 realized_eff=0.768 resist=0.06
+  -> Spray on plot 2,2 day 42. before=0.022 after=0.005 realized_eff=0.768 resist=0.06
+  -> Spray on plot 0,0 day 56. before=0.023 after=0.006 realized_eff=0.752 resist=0.08
+  -> Spray on plot 1,0 day 56. before=0.054 after=0.013 realized_eff=0.752 resist=0.08
+  -> Spray on plot 2,0 day 56. before=0.023 after=0.006 realized_eff=0.752 resist=0.08
+  -> Spray on plot 0,1 day 56. before=0.054 after=0.013 realized_eff=0.752 resist=0.08
+  -> Spray on plot 1,1 day 56. before=0.168 after=0.042 realized_eff=0.752 resist=0.08
+  -> Spray on plot 2,1 day 56. before=0.054 after=0.013 realized_eff=0.752 resist=0.08
+  -> Spray on plot 0,2 day 56. before=0.023 after=0.006 realized_eff=0.752 resist=0.08
+  -> Spray on plot 1,2 day 56. before=0.054 after=0.013 realized_eff=0.752 resist=0.08
+  -> Spray on plot 2,2 day 56. before=0.023 after=0.006 realized_eff=0.752 resist=0.08
+  -> Spray on plot 0,0 day 70. before=0.023 after=0.006 realized_eff=0.736 resist=0.1
+  -> Spray on plot 1,0 day 70. before=0.052 after=0.014 realized_eff=0.736 resist=0.1
+  -> Spray on plot 2,0 day 70. before=0.023 after=0.006 realized_eff=0.736 resist=0.1
+  -> Spray on plot 0,1 day 70. before=0.052 after=0.014 realized_eff=0.736 resist=0.1
+  -> Spray on plot 1,1 day 70. before=0.179 after=0.047 realized_eff=0.736 resist=0.1
+  -> Spray on plot 2,1 day 70. before=0.052 after=0.014 realized_eff=0.736 resist=0.1
+  -> Spray on plot 0,2 day 70. before=0.023 after=0.006 realized_eff=0.736 resist=0.1
+  -> Spray on plot 1,2 day 70. before=0.052 after=0.014 realized_eff=0.736 resist=0.1
+  -> Spray on plot 2,2 day 70. before=0.023 after=0.006 realized_eff=0.736 resist=0.1
+  Plot 0,0 harvested. Grain=3.96t/ha. PestLoss=0.05t/ha. Sprays=5. Revenue=11873.0. resist=0.1
+  Plot 1,0 harvested. Grain=3.88t/ha. PestLoss=0.13t/ha. Sprays=5. Revenue=11640.0. resist=0.1
+  Plot 2,0 harvested. Grain=3.96t/ha. PestLoss=0.05t/ha. Sprays=5. Revenue=11873.0. resist=0.1
+  Plot 0,1 harvested. Grain=3.88t/ha. PestLoss=0.13t/ha. Sprays=5. Revenue=11640.0. resist=0.1
+  Plot 1,1 harvested. Grain=3.51t/ha. PestLoss=0.5t/ha. Sprays=5. Revenue=10531.0. resist=0.1
+  Plot 2,1 harvested. Grain=3.88t/ha. PestLoss=0.13t/ha. Sprays=5. Revenue=11640.0. resist=0.1
+  Plot 0,2 harvested. Grain=3.96t/ha. PestLoss=0.05t/ha. Sprays=5. Revenue=11873.0. resist=0.1
+  Plot 1,2 harvested. Grain=3.88t/ha. PestLoss=0.13t/ha. Sprays=5. Revenue=11640.0. resist=0.1
+  Plot 2,2 harvested. Grain=3.96t/ha. PestLoss=0.05t/ha. Sprays=5. Revenue=11873.0. resist=0.1
+Day 76 | Season 1 harvested. Strategy=calendar. Money=105082.0.
+  -> Spray on plot 0,0 day 90. before=0.049 after=0.014 realized_eff=0.72 resist=0.12
+  -> Spray on plot 1,0 day 90. before=0.106 after=0.03 realized_eff=0.72 resist=0.12
+  -> Spray on plot 2,0 day 90. before=0.049 after=0.014 realized_eff=0.72 resist=0.12
+  -> Spray on plot 0,1 day 90. before=0.106 after=0.03 realized_eff=0.72 resist=0.12
+  -> Spray on plot 1,1 day 90. before=0.301 after=0.084 realized_eff=0.72 resist=0.12
+  -> Spray on plot 2,1 day 90. before=0.106 after=0.03 realized_eff=0.72 resist=0.12
+  -> Spray on plot 0,2 day 90. before=0.049 after=0.014 realized_eff=0.72 resist=0.12
+  -> Spray on plot 1,2 day 90. before=0.106 after=0.03 realized_eff=0.72 resist=0.12
+  -> Spray on plot 2,2 day 90. before=0.049 after=0.014 realized_eff=0.72 resist=0.12
+  -> Spray on plot 0,0 day 104. before=0.033 after=0.01 realized_eff=0.704 resist=0.14
+  -> Spray on plot 1,0 day 104. before=0.069 after=0.02 realized_eff=0.704 resist=0.14
+  -> Spray on plot 2,0 day 104. before=0.033 after=0.01 realized_eff=0.704 resist=0.14
+  -> Spray on plot 0,1 day 104. before=0.069 after=0.02 realized_eff=0.704 resist=0.14
+  -> Spray on plot 1,1 day 104. before=0.21 after=0.062 realized_eff=0.704 resist=0.14
+  -> Spray on plot 2,1 day 104. before=0.069 after=0.02 realized_eff=0.704 resist=0.14
+  -> Spray on plot 0,2 day 104. before=0.033 after=0.01 realized_eff=0.704 resist=0.14
+  -> Spray on plot 1,2 day 104. before=0.069 after=0.02 realized_eff=0.704 resist=0.14
+  -> Spray on plot 2,2 day 104. before=0.033 after=0.01 realized_eff=0.704 resist=0.14
+  -> Spray on plot 0,0 day 118. before=0.028 after=0.009 realized_eff=0.688 resist=0.16
+  -> Spray on plot 1,0 day 118. before=0.059 after=0.019 realized_eff=0.688 resist=0.16
+  -> Spray on plot 2,0 day 118. before=0.028 after=0.009 realized_eff=0.688 resist=0.16
+  -> Spray on plot 0,1 day 118. before=0.059 after=0.019 realized_eff=0.688 resist=0.16
+  -> Spray on plot 1,1 day 118. before=0.165 after=0.051 realized_eff=0.688 resist=0.16
+  -> Spray on plot 2,1 day 118. before=0.059 after=0.019 realized_eff=0.688 resist=0.16
+  -> Spray on plot 0,2 day 118. before=0.028 after=0.009 realized_eff=0.688 resist=0.16
+  -> Spray on plot 1,2 day 118. before=0.059 after=0.019 realized_eff=0.688 resist=0.16
+  -> Spray on plot 2,2 day 118. before=0.028 after=0.009 realized_eff=0.688 resist=0.16
+  -> Spray on plot 0,0 day 132. before=0.028 after=0.009 realized_eff=0.672 resist=0.18
+  -> Spray on plot 1,0 day 132. before=0.061 after=0.02 realized_eff=0.672 resist=0.18
+  -> Spray on plot 2,0 day 132. before=0.028 after=0.009 realized_eff=0.672 resist=0.18
+  -> Spray on plot 0,1 day 132. before=0.061 after=0.02 realized_eff=0.672 resist=0.18
+  -> Spray on plot 1,1 day 132. before=0.193 after=0.063 realized_eff=0.672 resist=0.18
+  -> Spray on plot 2,1 day 132. before=0.061 after=0.02 realized_eff=0.672 resist=0.18
+  -> Spray on plot 0,2 day 132. before=0.028 after=0.009 realized_eff=0.672 resist=0.18
+  -> Spray on plot 1,2 day 132. before=0.061 after=0.02 realized_eff=0.672 resist=0.18
+  -> Spray on plot 2,2 day 132. before=0.028 after=0.009 realized_eff=0.672 resist=0.18
+  -> Spray on plot 0,0 day 146. before=0.029 after=0.01 realized_eff=0.656 resist=0.2
+  -> Spray on plot 1,0 day 146. before=0.063 after=0.022 realized_eff=0.656 resist=0.2
+  -> Spray on plot 2,0 day 146. before=0.029 after=0.01 realized_eff=0.656 resist=0.2
+  -> Spray on plot 0,1 day 146. before=0.063 after=0.022 realized_eff=0.656 resist=0.2
+  -> Spray on plot 1,1 day 146. before=0.205 after=0.07 realized_eff=0.656 resist=0.2
+  -> Spray on plot 2,1 day 146. before=0.063 after=0.022 realized_eff=0.656 resist=0.2
+  -> Spray on plot 0,2 day 146. before=0.029 after=0.01 realized_eff=0.656 resist=0.2
+  -> Spray on plot 1,2 day 146. before=0.063 after=0.022 realized_eff=0.656 resist=0.2
+  -> Spray on plot 2,2 day 146. before=0.029 after=0.01 realized_eff=0.656 resist=0.2
+  Plot 0,0 harvested. Grain=3.94t/ha. PestLoss=0.07t/ha. Sprays=5. Revenue=11828.0. resist=0.2
+  Plot 1,0 harvested. Grain=3.85t/ha. PestLoss=0.16t/ha. Sprays=5. Revenue=11555.0. resist=0.2
+  Plot 2,0 harvested. Grain=3.94t/ha. PestLoss=0.07t/ha. Sprays=5. Revenue=11828.0. resist=0.2
+  Plot 0,1 harvested. Grain=3.85t/ha. PestLoss=0.16t/ha. Sprays=5. Revenue=11555.0. resist=0.2
+  Plot 1,1 harvested. Grain=3.44t/ha. PestLoss=0.56t/ha. Sprays=5. Revenue=10331.0. resist=0.2
+  Plot 2,1 harvested. Grain=3.85t/ha. PestLoss=0.16t/ha. Sprays=5. Revenue=11555.0. resist=0.2
+  Plot 0,2 harvested. Grain=3.94t/ha. PestLoss=0.07t/ha. Sprays=5. Revenue=11828.0. resist=0.2
+  Plot 1,2 harvested. Grain=3.85t/ha. PestLoss=0.16t/ha. Sprays=5. Revenue=11555.0. resist=0.2
+  Plot 2,2 harvested. Grain=3.94t/ha. PestLoss=0.07t/ha. Sprays=5. Revenue=11828.0. resist=0.2
+Day 152 | Season 2 harvested. Strategy=calendar. Money=204441.0.
+  -> Spray on plot 0,0 day 166. before=0.046 after=0.017 realized_eff=0.64 resist=0.22
+  -> Spray on plot 1,0 day 166. before=0.099 after=0.036 realized_eff=0.64 resist=0.22
+  -> Spray on plot 2,0 day 166. before=0.046 after=0.017 realized_eff=0.64 resist=0.22
+  -> Spray on plot 0,1 day 166. before=0.099 after=0.036 realized_eff=0.64 resist=0.22
+  -> Spray on plot 1,1 day 166. before=0.279 after=0.101 realized_eff=0.64 resist=0.22
+  -> Spray on plot 2,1 day 166. before=0.099 after=0.036 realized_eff=0.64 resist=0.22
+  -> Spray on plot 0,2 day 166. before=0.046 after=0.017 realized_eff=0.64 resist=0.22
+  -> Spray on plot 1,2 day 166. before=0.099 after=0.036 realized_eff=0.64 resist=0.22
+  -> Spray on plot 2,2 day 166. before=0.046 after=0.017 realized_eff=0.64 resist=0.22
+  -> Spray on plot 0,0 day 180. before=0.039 after=0.015 realized_eff=0.624 resist=0.24
+  -> Spray on plot 1,0 day 180. before=0.079 after=0.03 realized_eff=0.624 resist=0.24
+  -> Spray on plot 2,0 day 180. before=0.039 after=0.015 realized_eff=0.624 resist=0.24
+  -> Spray on plot 0,1 day 180. before=0.079 after=0.03 realized_eff=0.624 resist=0.24
+  -> Spray on plot 1,1 day 180. before=0.226 after=0.085 realized_eff=0.624 resist=0.24
+  -> Spray on plot 2,1 day 180. before=0.079 after=0.03 realized_eff=0.624 resist=0.24
+  -> Spray on plot 0,2 day 180. before=0.039 after=0.015 realized_eff=0.624 resist=0.24
+  -> Spray on plot 1,2 day 180. before=0.079 after=0.03 realized_eff=0.624 resist=0.24
+  -> Spray on plot 2,2 day 180. before=0.039 after=0.015 realized_eff=0.624 resist=0.24
+  -> Spray on plot 0,0 day 194. before=0.034 after=0.013 realized_eff=0.608 resist=0.26
+  -> Spray on plot 1,0 day 194. before=0.068 after=0.027 realized_eff=0.608 resist=0.26
+  -> Spray on plot 2,0 day 194. before=0.034 after=0.013 realized_eff=0.608 resist=0.26
+  -> Spray on plot 0,1 day 194. before=0.068 after=0.027 realized_eff=0.608 resist=0.26
+  -> Spray on plot 1,1 day 194. before=0.188 after=0.074 realized_eff=0.608 resist=0.26
+  -> Spray on plot 2,1 day 194. before=0.068 after=0.027 realized_eff=0.608 resist=0.26
+  -> Spray on plot 0,2 day 194. before=0.034 after=0.013 realized_eff=0.608 resist=0.26
+  -> Spray on plot 1,2 day 194. before=0.068 after=0.027 realized_eff=0.608 resist=0.26
+  -> Spray on plot 2,2 day 194. before=0.034 after=0.013 realized_eff=0.608 resist=0.26
+  -> Spray on plot 0,0 day 208. before=0.033 after=0.014 realized_eff=0.592 resist=0.28
+  -> Spray on plot 1,0 day 208. before=0.068 after=0.028 realized_eff=0.592 resist=0.28
+  -> Spray on plot 2,0 day 208. before=0.033 after=0.014 realized_eff=0.592 resist=0.28
+  -> Spray on plot 0,1 day 208. before=0.068 after=0.028 realized_eff=0.592 resist=0.28
+  -> Spray on plot 1,1 day 208. before=0.187 after=0.076 realized_eff=0.592 resist=0.28
+  -> Spray on plot 2,1 day 208. before=0.068 after=0.028 realized_eff=0.592 resist=0.28
+  -> Spray on plot 0,2 day 208. before=0.033 after=0.014 realized_eff=0.592 resist=0.28
+  -> Spray on plot 1,2 day 208. before=0.068 after=0.028 realized_eff=0.592 resist=0.28
+  -> Spray on plot 2,2 day 208. before=0.033 after=0.014 realized_eff=0.592 resist=0.28
+  -> Spray on plot 0,0 day 222. before=0.033 after=0.014 realized_eff=0.576 resist=0.3
+  -> Spray on plot 1,0 day 222. before=0.068 after=0.029 realized_eff=0.576 resist=0.3
+  -> Spray on plot 2,0 day 222. before=0.033 after=0.014 realized_eff=0.576 resist=0.3
+  -> Spray on plot 0,1 day 222. before=0.068 after=0.029 realized_eff=0.576 resist=0.3
+  -> Spray on plot 1,1 day 222. before=0.201 after=0.085 realized_eff=0.576 resist=0.3
+  -> Spray on plot 2,1 day 222. before=0.068 after=0.029 realized_eff=0.576 resist=0.3
+  -> Spray on plot 0,2 day 222. before=0.033 after=0.014 realized_eff=0.576 resist=0.3
+  -> Spray on plot 1,2 day 222. before=0.068 after=0.029 realized_eff=0.576 resist=0.3
+  -> Spray on plot 2,2 day 222. before=0.033 after=0.014 realized_eff=0.576 resist=0.3
+  Plot 0,0 harvested. Grain=3.93t/ha. PestLoss=0.08t/ha. Sprays=5. Revenue=11788.0. resist=0.3
+  Plot 1,0 harvested. Grain=3.83t/ha. PestLoss=0.18t/ha. Sprays=5. Revenue=11495.0. resist=0.3
+  Plot 2,0 harvested. Grain=3.93t/ha. PestLoss=0.08t/ha. Sprays=5. Revenue=11788.0. resist=0.3
+  Plot 0,1 harvested. Grain=3.83t/ha. PestLoss=0.18t/ha. Sprays=5. Revenue=11495.0. resist=0.3
+  Plot 1,1 harvested. Grain=3.43t/ha. PestLoss=0.58t/ha. Sprays=5. Revenue=10286.0. resist=0.3
+  Plot 2,1 harvested. Grain=3.83t/ha. PestLoss=0.18t/ha. Sprays=5. Revenue=11495.0. resist=0.3
+  Plot 0,2 harvested. Grain=3.93t/ha. PestLoss=0.08t/ha. Sprays=5. Revenue=11788.0. resist=0.3
+  Plot 1,2 harvested. Grain=3.83t/ha. PestLoss=0.18t/ha. Sprays=5. Revenue=11495.0. resist=0.3
+  Plot 2,2 harvested. Grain=3.93t/ha. PestLoss=0.08t/ha. Sprays=5. Revenue=11788.0. resist=0.3
+Day 228 | Season 3 harvested. Strategy=calendar. Money=303360.0.
+All 3 season(s) complete. Strategy: calendar
+  -> Spray on plot 1,1 day 7. before=0.32 after=0.064 realized_eff=0.8 resist=0.02
+  -> Spray on plot 1,1 day 37. before=0.306 after=0.066 realized_eff=0.784 resist=0.04
+  -> Spray on plot 1,1 day 49. before=0.301 after=0.07 realized_eff=0.768 resist=0.06
+  -> Spray on plot 1,1 day 61. before=0.3 after=0.074 realized_eff=0.752 resist=0.08
+  -> Spray on plot 1,1 day 70. before=0.304 after=0.08 realized_eff=0.736 resist=0.1
+  Plot 0,0 harvested. Grain=3.77t/ha. PestLoss=0.23t/ha. Sprays=0. Revenue=11322.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.62t/ha. PestLoss=0.39t/ha. Sprays=0. Revenue=10845.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.77t/ha. PestLoss=0.23t/ha. Sprays=0. Revenue=11322.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.62t/ha. PestLoss=0.39t/ha. Sprays=0. Revenue=10845.0. resist=0.0
+  Plot 1,1 harvested. Grain=3.28t/ha. PestLoss=0.73t/ha. Sprays=5. Revenue=9837.0. resist=0.1
+  Plot 2,1 harvested. Grain=3.62t/ha. PestLoss=0.39t/ha. Sprays=0. Revenue=10845.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.77t/ha. PestLoss=0.23t/ha. Sprays=0. Revenue=11322.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.62t/ha. PestLoss=0.39t/ha. Sprays=0. Revenue=10845.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.77t/ha. PestLoss=0.23t/ha. Sprays=0. Revenue=11322.0. resist=0.0
+Day 76 | Season 1 harvested. Strategy=threshold. Money=103007.0.
+  -> Spray on plot 1,1 day 104. before=0.304 after=0.085 realized_eff=0.72 resist=0.12
+  -> Spray on plot 1,1 day 122. before=0.311 after=0.092 realized_eff=0.704 resist=0.14
+  -> Spray on plot 1,1 day 130. before=0.303 after=0.094 realized_eff=0.688 resist=0.16
+  -> Spray on plot 1,1 day 141. before=0.302 after=0.099 realized_eff=0.672 resist=0.18
+  -> Spray on plot 1,1 day 149. before=0.309 after=0.106 realized_eff=0.656 resist=0.2
+  Plot 0,0 harvested. Grain=3.74t/ha. PestLoss=0.26t/ha. Sprays=0. Revenue=11230.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.57t/ha. PestLoss=0.44t/ha. Sprays=0. Revenue=10697.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.74t/ha. PestLoss=0.26t/ha. Sprays=0. Revenue=11230.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.57t/ha. PestLoss=0.44t/ha. Sprays=0. Revenue=10697.0. resist=0.0
+  Plot 1,1 harvested. Grain=3.19t/ha. PestLoss=0.81t/ha. Sprays=5. Revenue=9583.0. resist=0.2
+  Plot 2,1 harvested. Grain=3.57t/ha. PestLoss=0.44t/ha. Sprays=0. Revenue=10697.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.74t/ha. PestLoss=0.26t/ha. Sprays=0. Revenue=11230.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.57t/ha. PestLoss=0.44t/ha. Sprays=0. Revenue=10697.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.74t/ha. PestLoss=0.26t/ha. Sprays=0. Revenue=11230.0. resist=0.0
+Day 152 | Season 2 harvested. Strategy=threshold. Money=199796.0.
+  -> Spray on plot 1,1 day 159. before=0.301 after=0.108 realized_eff=0.64 resist=0.22
+  -> Spray on plot 1,1 day 189. before=0.301 after=0.113 realized_eff=0.624 resist=0.24
+  -> Spray on plot 1,1 day 202. before=0.303 after=0.119 realized_eff=0.608 resist=0.26
+  -> Spray on plot 1,1 day 213. before=0.305 after=0.124 realized_eff=0.592 resist=0.28
+  -> Spray on plot 1,1 day 220. before=0.303 after=0.128 realized_eff=0.576 resist=0.3
+  Plot 0,0 harvested. Grain=3.76t/ha. PestLoss=0.25t/ha. Sprays=0. Revenue=11279.0. resist=0.0
+  Plot 1,0 harvested. Grain=3.59t/ha. PestLoss=0.42t/ha. Sprays=0. Revenue=10769.0. resist=0.0
+  Plot 2,0 harvested. Grain=3.76t/ha. PestLoss=0.25t/ha. Sprays=0. Revenue=11279.0. resist=0.0
+  Plot 0,1 harvested. Grain=3.59t/ha. PestLoss=0.42t/ha. Sprays=0. Revenue=10769.0. resist=0.0
+  Plot 1,1 harvested. Grain=3.22t/ha. PestLoss=0.78t/ha. Sprays=5. Revenue=9668.0. resist=0.3
+  Plot 2,1 harvested. Grain=3.59t/ha. PestLoss=0.42t/ha. Sprays=0. Revenue=10769.0. resist=0.0
+  Plot 0,2 harvested. Grain=3.76t/ha. PestLoss=0.25t/ha. Sprays=0. Revenue=11279.0. resist=0.0
+  Plot 1,2 harvested. Grain=3.59t/ha. PestLoss=0.42t/ha. Sprays=0. Revenue=10769.0. resist=0.0
+  Plot 2,2 harvested. Grain=3.76t/ha. PestLoss=0.25t/ha. Sprays=0. Revenue=11279.0. resist=0.0
+Day 228 | Season 3 harvested. Strategy=threshold. Money=297155.0.
+All 3 season(s) complete. Strategy: threshold

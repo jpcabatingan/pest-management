@@ -1,0 +1,66 @@
+Day 0 | Season 1: sown. Strategy=none
+Day 75 | Season 1: harvested. Strategy=none. Grain=2.04t/ha. PestLoss=1.97t/ha. Sprays=0. Money=5000.0.
+Day 76 | Season 2: sown. Strategy=none
+Day 151 | Season 2: harvested. Strategy=none. Grain=2.04t/ha. PestLoss=1.97t/ha. Sprays=0. Money=11118.0.
+Day 152 | Season 3: sown. Strategy=none
+Day 227 | Season 3: harvested. Strategy=none. Grain=2.07t/ha. PestLoss=1.94t/ha. Sprays=0. Money=17236.0.
+All 3 season(s) complete. Strategy: none
+Day 0 | Season 1: sown. Strategy=calendar
+  -> Spray 1 on day 14. pest_load_before=1.0. pest_load_after=0.2. Money=4900.0
+  -> Spray 2 on day 28. pest_load_before=1.0. pest_load_after=0.2. Money=4800.0
+  -> Spray 3 on day 42. pest_load_before=1.0. pest_load_after=0.2. Money=4700.0
+  -> Spray 4 on day 56. pest_load_before=1.0. pest_load_after=0.2. Money=4600.0
+  -> Spray 5 on day 70. pest_load_before=1.0. pest_load_after=0.2. Money=4500.0
+Day 75 | Season 1: harvested. Strategy=calendar. Grain=2.29t/ha. PestLoss=1.71t/ha. Sprays=5. Money=4500.0.
+Day 76 | Season 2: sown. Strategy=calendar
+  -> Spray 1 on day 90. pest_load_before=1.0. pest_load_after=0.2. Money=11280.0
+  -> Spray 2 on day 104. pest_load_before=1.0. pest_load_after=0.2. Money=11180.0
+  -> Spray 3 on day 118. pest_load_before=1.0. pest_load_after=0.2. Money=11080.0
+  -> Spray 4 on day 132. pest_load_before=1.0. pest_load_after=0.2. Money=10980.0
+  -> Spray 5 on day 146. pest_load_before=1.0. pest_load_after=0.2. Money=10880.0
+Day 151 | Season 2: harvested. Strategy=calendar. Grain=2.28t/ha. PestLoss=1.73t/ha. Sprays=5. Money=10880.0.
+Day 152 | Season 3: sown. Strategy=calendar
+  -> Spray 1 on day 166. pest_load_before=1.0. pest_load_after=0.2. Money=17611.0
+  -> Spray 2 on day 180. pest_load_before=1.0. pest_load_after=0.2. Money=17511.0
+  -> Spray 3 on day 194. pest_load_before=1.0. pest_load_after=0.2. Money=17411.0
+  -> Spray 4 on day 208. pest_load_before=1.0. pest_load_after=0.2. Money=17311.0
+  -> Spray 5 on day 222. pest_load_before=1.0. pest_load_after=0.2. Money=17211.0
+Day 227 | Season 3: harvested. Strategy=calendar. Grain=2.29t/ha. PestLoss=1.72t/ha. Sprays=5. Money=17211.0.
+All 3 season(s) complete. Strategy: calendar
+Day 0 | Season 1: sown. Strategy=threshold
+  -> Spray 1 on day 7. pest_load_before=0.4. pest_load_after=0.08. Money=4900.0
+  -> Spray 2 on day 14. pest_load_before=0.68. pest_load_after=0.136. Money=4800.0
+  -> Spray 3 on day 21. pest_load_before=0.836. pest_load_after=0.167. Money=4700.0
+  -> Spray 4 on day 28. pest_load_before=0.667. pest_load_after=0.133. Money=4600.0
+  -> Spray 5 on day 35. pest_load_before=0.733. pest_load_after=0.147. Money=4500.0
+  -> Spray 6 on day 42. pest_load_before=0.747. pest_load_after=0.149. Money=4400.0
+  -> Spray 7 on day 49. pest_load_before=0.749. pest_load_after=0.15. Money=4300.0
+  -> Spray 8 on day 56. pest_load_before=0.55. pest_load_after=0.11. Money=4200.0
+  -> Spray 9 on day 63. pest_load_before=0.61. pest_load_after=0.122. Money=4100.0
+  -> Spray 10 on day 70. pest_load_before=0.622. pest_load_after=0.124. Money=4000.0
+Day 75 | Season 1: harvested. Strategy=threshold. Grain=2.69t/ha. PestLoss=1.32t/ha. Sprays=10. Money=4000.0.
+Day 76 | Season 2: sown. Strategy=threshold
+  -> Spray 1 on day 83. pest_load_before=0.5. pest_load_after=0.1. Money=11956.0
+  -> Spray 2 on day 90. pest_load_before=0.6. pest_load_after=0.12. Money=11856.0
+  -> Spray 3 on day 97. pest_load_before=0.52. pest_load_after=0.104. Money=11756.0
+  -> Spray 4 on day 104. pest_load_before=0.804. pest_load_after=0.161. Money=11656.0
+  -> Spray 5 on day 111. pest_load_before=0.861. pest_load_after=0.172. Money=11556.0
+  -> Spray 6 on day 118. pest_load_before=0.772. pest_load_after=0.154. Money=11456.0
+  -> Spray 7 on day 125. pest_load_before=0.654. pest_load_after=0.131. Money=11356.0
+  -> Spray 8 on day 132. pest_load_before=0.631. pest_load_after=0.126. Money=11256.0
+  -> Spray 9 on day 139. pest_load_before=0.726. pest_load_after=0.145. Money=11156.0
+  -> Spray 10 on day 146. pest_load_before=0.645. pest_load_after=0.129. Money=11056.0
+Day 151 | Season 2: harvested. Strategy=threshold. Grain=2.64t/ha. PestLoss=1.37t/ha. Sprays=10. Money=11056.0.
+Day 152 | Season 3: sown. Strategy=threshold
+  -> Spray 1 on day 159. pest_load_before=0.6. pest_load_after=0.12. Money=18862.0
+  -> Spray 2 on day 166. pest_load_before=0.82. pest_load_after=0.164. Money=18762.0
+  -> Spray 3 on day 173. pest_load_before=0.764. pest_load_after=0.153. Money=18662.0
+  -> Spray 4 on day 180. pest_load_before=0.853. pest_load_after=0.171. Money=18562.0
+  -> Spray 5 on day 187. pest_load_before=0.571. pest_load_after=0.114. Money=18462.0
+  -> Spray 6 on day 194. pest_load_before=0.714. pest_load_after=0.143. Money=18362.0
+  -> Spray 7 on day 201. pest_load_before=0.643. pest_load_after=0.129. Money=18262.0
+  -> Spray 8 on day 208. pest_load_before=0.829. pest_load_after=0.166. Money=18162.0
+  -> Spray 9 on day 215. pest_load_before=0.666. pest_load_after=0.133. Money=18062.0
+  -> Spray 10 on day 222. pest_load_before=0.633. pest_load_after=0.127. Money=17962.0
+Day 227 | Season 3: harvested. Strategy=threshold. Grain=2.59t/ha. PestLoss=1.42t/ha. Sprays=10. Money=17962.0.
+All 3 season(s) complete. Strategy: threshold
