@@ -1,9 +1,9 @@
 /**
- * Name:        test_pest
- * Description: phase_2 model logic with the pest_hunting_game visual style.
+ * Name:        phase_2
+ * Description: 10x10 spatial pest model with BPH sprite visuals.
  *
- *              SIMULATION (identical to phase_2.gaml):
- *                - 3x3 Plot grid, von Neumann neighbours
+ *              SIMULATION:
+ *                - 10x10 Plot grid, Moore neighbours (8)
  *                - Layer 1 crop growth (thermal time, fAPAR, RUE)
  *                - Layer 2 pest generation + synchronous diffusion (pest_step)
  *                - Layer 3 farmer strategies (none / calendar / threshold)
@@ -26,7 +26,7 @@
  * Author: Joanne Maryz Cabatingan (visuals scaffold)
  */
 
-model test_pest
+model phase_2
 
 global {
 
@@ -53,6 +53,21 @@ global {
     float pest_temp_limit      <- 27.0;
     float pest_infection_prob  <- 0.8;
     float pest_daily_increment <- 0.03;
+    // ---- Life-table-derived proportional growth term (added June 22 2026) ----
+    // rm = 0.0677/female/day (Win et al. 2011, Table 3); female_fraction = 0.488
+    // (Win et al. 2011: sex ratio M:F = 0.512:0.488; supervisor-approved June 22 2026
+    // to apply only the female fraction as reproducers).
+    // pest_growth_rate = rm * female_fraction = 0.0677 * 0.488 = 0.033038
+    // Update mechanism: pest_load += pest_daily_increment + (pest_load * pest_growth_rate)
+    // Keeps the existing flat term (handles cold-start at pest_load=0, matches
+    // STAR-FARM's lua_mdModel structure) and adds a proportional term so growth
+    // scales with current pest_load, addressing the linear-vs-exponential gap
+    // flagged in tab1.md S2.1. NOT a new equation: same additive update, one
+    // extra multiplicative term using a literature-sourced rate. See phase_1.gaml
+    // for the same change applied to the single-plot model.
+    // TODO: update tab3.md (D3 design decisions, global var table, OPEN
+    // CALIBRATION ITEMS, tab1.md S2.1 model implication) to document this change.
+    float pest_growth_rate     <- 0.033038;
     
 	// placeholder values only; literature backs damage ranking but not actual values   
     float sw_phase1 <- 0.2;
@@ -96,24 +111,42 @@ global {
 
     // ---- Phase 2 extended parameters ------------------------------------------
 	// placeholders    
-    float diffusion_prop              <- 0.15;
+    float diffusion_prop              <- 0.1;
     float selection_pressure_constant <- 0.02; 
 
+    // ---- Per-pesticide-class parameterization (added June 23 2026, UNCALIBRATED) ----
+    // "starfarm" = current global efficacy/selection_pressure_constant behavior, unchanged.
+    // "etofenprox"/"neonicotinoid" values below are PLACEHOLDERS for proposed structure only,
+    // ordering reflects qualitative Khoa et al. 2018 claims (etofenprox lower resistance/resurgence
+    // risk), not measured rates. Do not cite these numbers anywhere. See phase_1.gaml for same change.
+    string pesticide_choice <- "starfarm" among: ["starfarm", "etofenprox", "neonicotinoid"];
+
     // ---- Outbreak / diffusion demo controls -----------------------------------
-    bool  localized_infection <- true;
+    bool  localized_infection <- false;
     float outbreak_seed       <- 0.5;
-    int   outbreak_cx         <- 1;
-    int   outbreak_cy         <- 1;
+    int   outbreak_cx         <- 4;
+    int   outbreak_cy         <- 4;
 
     // ---- VISUAL layer ---------------------------------------------------------
     // note: bph sprites are for visual presentation purposes only
     int   max_bph_per_plot <- 18;   // sprites shown when a plot is fully infested
+
+    // ---- Batch infrastructure -------------------------------------------------
+    bool   batch_mode <- false;   // true only in batch; gates sprites, pause, grid CSV
+    string run_id     <- "";      // unique per simulation
 
     init {
         emergence_threshold <- tt_emergence;
         flowering_threshold <- tt_emergence + tt_veg;
         maturity_threshold  <- tt_emergence + tt_veg + tt_rep;
         create Farmer number: 1;
+        run_id <- farmer_strategy + "_" + int(self);
+
+        // Per-pesticide-class instances. PLACEHOLDER values, see comment above
+        // pesticide_choice. selection_pressure here replaces selection_pressure_constant
+        // when pesticide_choice != "starfarm".
+        create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; resurgence_type <- "none";   selection_pressure <- 0.015; }
+        create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; resurgence_type <- "chronic"; selection_pressure <- 0.025; }
     }
     
     reflex reset_events {
@@ -140,7 +173,7 @@ global {
 	        // 		4. A probabilistic flip weighted by pest_infection_prob succeeds  (flip(pest_infection_prob))
 	        // this models the stochastic, weather-dependent nature of daily BPH infection events.
             if (is_source and humidity > pest_humidity_limit and t_mean > pest_temp_limit and flip(pest_infection_prob)) {
-                pest_load <- pest_load + pest_daily_increment;
+                pest_load <- pest_load + pest_daily_increment + (pest_load * pest_growth_rate);
             }
             
             // pest_load is a normalized scalar, not a population count.
@@ -159,7 +192,7 @@ global {
                     // total amount to donate is a fixed proportion of current pest_load.
 	                float to_share <- pest_load * diffusion_prop;
 	                
-	                // split equally across all neighbors (von Neumann: up to 4).
+	                // split equally across all neighbors (Moore: up to 8).
 	                // edge and corner plots have fewer neighbors, so each neighbor receives more.
 	                float share_each <- to_share / length(nbrs);
 	                
@@ -216,10 +249,18 @@ global {
 	        
 	        // log per-plot harvest summary to the console
 	        // includes grain, pest loss, spray count, revenue, and resistance level at harvest
+	        if (not batch_mode) {
 	        write "  Plot " + grid_x + "," + grid_y + " harvested. Grain=" + (grain_tha with_precision 2)
 	            + "t/ha. PestLoss=" + (yield_loss_tha with_precision 2) + "t/ha. Sprays=" + spray_count
 	            + ". Revenue=" + (revenue with_precision 0)
 	            + ". resist=" + (resistant_fraction with_precision 3);
+	        }
+	        
+	        if (batch_mode) {
+	            string hrow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "\n";
+	            save hrow to: "harvest_grid_output.csv" format: "text" rewrite: false;
+	        }
 	        
 	        // remove the crop agent from the simulation. it has served its purpose
 	        ask associated_crop { do die; }
@@ -233,8 +274,10 @@ global {
 	    float farmer_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
 	    
 	    // log the season-level summary to the console.
+	    if (not batch_mode) {
 	    write "Day " + cycle + " | Season " + season + " harvested. Strategy=" + farmer_strategy
 	        + ". Money=" + (farmer_money with_precision 0) + ".";
+	    }
 	
 	    // advance the season counter
 	    season <- season + 1;
@@ -251,14 +294,14 @@ global {
 	// stop simulation when season number limit reached
     reflex stop_when_done when: season > max_seasons {
         write "All " + max_seasons + " season(s) complete. Strategy: " + farmer_strategy;
-        do pause;
+        if (not batch_mode) { do pause; }
     }
 
     // ---- VISUAL sync: pest_load density -> crawling BPH sprites ----------------
     // Cosmetic only. Each cycle, reconcile the number of Bph on each plot to
     // round(pest_load * max_bph_per_plot) via create/die (same pattern the
     // pest_hunting model uses to keep its sprite count matching the formula).
-	reflex sync_bph_visuals {
+	reflex sync_bph_visuals when: not batch_mode {
 	    ask Plot {
 	    
 	        // figure out how many bph sprites this plot should have
@@ -292,6 +335,18 @@ global {
 }
 
 // ===========================================================================
+// pesticide_class: per-compound parameterization (added June 23 2026, UNCALIBRATED).
+// See pesticide_choice comment in global{} for sourcing caveat.
+// ===========================================================================
+
+species pesticide_class {
+    string name;
+    float  efficacy;
+    string resurgence_type;
+    float  selection_pressure;
+}
+
+// ===========================================================================
 // CROP (unchanged from phase_2)
 // ===========================================================================
 // represents a single rice crop growing on a plot for one season
@@ -309,7 +364,6 @@ species Crop {
         // daily thermal time increment: how many degrees above the base temperature today was
         // if t_mean is below Tbase, dTT is 0 - the crop does not develop on cold days
         float dTT <- max(0.0, t_mean - Tbase);
-        
         thermal_time <- thermal_time + dTT; 	// add today's heat units to the running total  
         growth_stage <- min(1.0, thermal_time / maturity_threshold);	// growth_stage is just thermal_time scaled to [0, 1] for display purposes
     }
@@ -363,10 +417,10 @@ species Crop {
 
 // ===========================================================================
 // PLOT (two aspects: rice-field palette + raw heatmap)
-// the 3x3 grid of plots: each cell is one farm plot
-// neighbors: 4 means each plot only connects to its 4 direct neighbors (von neumann, no diagonals)
+// the 10x10 grid of plots: each cell is one farm plot
+// neighbors: 8 means each plot connects to its 8 surrounding neighbors (Moore, includes diagonals)
 // ===========================================================================
-grid Plot width: 3 height: 3 neighbors: 4 {
+grid Plot width: 10 height: 10 neighbors: 8 {
     
     Crop associated_crop <- nil;	// the crop currently growing on this plot, nil if the plot is fallow
     bool pending_sow <- true;		// flag that tells the plot to sow a new crop on the next cycle    
@@ -528,10 +582,21 @@ species Farmer {
             if (should_spray) {
             
                 float pest_before <- pest_load; // snapshot pest_load before spraying for the console log
+
+                // active compound's efficacy and selection_pressure (starfarm = unchanged globals)
+                float active_efficacy <- efficacy;
+                float active_selection_pressure <- selection_pressure_constant;
+                if (pesticide_choice != "starfarm") {
+                    pesticide_class pc <- pesticide_class first_with (each.name = pesticide_choice);
+                    if (pc != nil) {
+                        active_efficacy <- pc.efficacy;
+                        active_selection_pressure <- pc.selection_pressure;
+                    }
+                }
                 
                 // realized efficacy is reduced by how resistant the local pest population already is
                 // as resistant_fraction increases, each spray removes less pest pressure
-                float realized_efficacy <- efficacy * (1.0 - resistant_fraction);
+                float realized_efficacy <- active_efficacy * (1.0 - resistant_fraction);
                 
                 // apply the spray: reduce pest_load by the realized efficacy fraction
                 // pest_load is not zeroed out — partial suppression keeps the sawtooth dynamics realistic
@@ -539,7 +604,7 @@ species Farmer {
                 
                 // ratchet up resistance on this plot
                 // each spray selects for resistant individuals, so resistant_fraction only ever increases
-                resistant_fraction <- min(1.0, resistant_fraction + selection_pressure_constant);
+                resistant_fraction <- min(1.0, resistant_fraction + active_selection_pressure);
                 
                 days_since_last_spray <- 0;		// reset the cooldown counter     
                 spray_count <- spray_count + 1;		// increment this plot's spray count for the season
@@ -549,11 +614,13 @@ species Farmer {
                 spray_event <- 1;
                 
                 // log spray details to the console
+                if (not batch_mode) {
                 write "  -> Spray on plot " + grid_x + "," + grid_y + " day " + cycle
                     + ". before=" + (pest_before with_precision 3)
                     + " after=" + (pest_load with_precision 3)
                     + " realized_eff=" + (realized_efficacy with_precision 3)
                     + " resist=" + (resistant_fraction with_precision 3);
+                }
             }
         }
     }
@@ -570,9 +637,11 @@ experiment pest_spatial type: gui {
     parameter "potential_rue (g/MJ)"         var: potential_rue       min: 0.5   max: 3.0;
     parameter "Seasons to simulate"          var: max_seasons         min: 1     max: 5;
     parameter "pest_daily_increment"         var: pest_daily_increment min: 0.01 max: 0.1;
+    parameter "pest_growth_rate (life-table)" var: pest_growth_rate    min: 0.0   max: 0.1;
     parameter "min_k_pest"                   var: min_k_pest          min: 0.1   max: 1.0;
 
     parameter "Strategy"                     var: farmer_strategy among: ["none", "calendar", "threshold"];
+    parameter "Pesticide class"              var: pesticide_choice    among: ["starfarm", "etofenprox", "neonicotinoid"];
     parameter "pesticide_threshold"          var: pesticide_threshold min: 0.05  max: 1.0;
     parameter "spray_cooldown (days)"        var: spray_cooldown      min: 1     max: 30;
     parameter "calendar_interval (days)"     var: calendar_interval   min: 7     max: 30;
@@ -676,6 +745,21 @@ experiment pest_spatial type: gui {
 	        data "Harvest" value: harvest_event color: #yellow style: bar marker: false;
     	}
 }
+    }
+}
+
+// ===========================================================================
+// BATCH: one row per plot per season per run -> harvest_grid_output.csv
+// runs each strategy `repeat` times with different seeds (flip + diffusion variance)
+// ===========================================================================
+experiment Batch_Harvest_Grid type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"   var: farmer_strategy among: ["none", "calendar", "threshold"];
+    parameter "Batch mode" var: batch_mode      among: [true];
+
+    init {
+        // header once + clears old file (auto-handles the delete-CSV step)
+        save "run_id,strategy,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction\n"
+             to: "harvest_grid_output.csv" format: "text" rewrite: true;
     }
 }
 	
