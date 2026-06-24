@@ -14,8 +14,7 @@
  *   Farmer  : decide_spray reflex -- dispatches none / calendar / threshold
  *
  * Strategies:
- *   "none"      - never spray (baseline: 43.75% yield loss at defaults;
- *                 supersedes old 43.1% after tt/harvest_index correction, cultivars.csv OM5451)
+ *   "none"      - never spray (baseline: 43.75% yield loss at defaults, cultivars.csv OM5451)
  *   "calendar"  - spray every calendar_interval days regardless of pest_load
  *   "threshold" - spray when pest_load > pesticide_threshold AND cooldown elapsed
  *
