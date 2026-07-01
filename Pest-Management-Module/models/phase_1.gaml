@@ -128,6 +128,13 @@ global {
     string run_id     <- "";      // unique per simulation
     bool   sweep_mode <- false;   // true only in the 4 Sweep_* experiments; gates sensitivity_output.csv writes
 
+    // ---- Interval / threshold sweep gates (added June 29 2026) ----
+    // Task 1: how does grain yield and spray count change across different
+    // calendar_interval values, and across different pesticide_threshold values?
+    // Each gate writes its own CSV, so there is no rename step needed between runs.
+    bool   interval_sweep_mode  <- false;  // true only in Sweep_CalendarInterval; gates sensitivity_output_interval.csv
+    bool   threshold_sweep_mode <- false;  // true only in Sweep_Threshold; gates sensitivity_output_threshold.csv
+
     init {
         emergence_threshold <- tt_emergence;
         flowering_threshold <- tt_emergence + tt_veg;
@@ -136,11 +143,12 @@ global {
         create Farmer number: 1;
         run_id <- farmer_strategy + "_" + int(self);
 
-        // Per-pesticide-class instances. PLACEHOLDER values, see comment above
-        // pesticide_choice. selection_pressure unused in phase_1 (no resistance
-        // ratchet here; carried for symmetry with phase_2's pesticide_class).
-        create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; resurgence_type <- "none";   selection_pressure <- 0.015; }
-        create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; resurgence_type <- "chronic"; selection_pressure <- 0.025; }
+        // Per-pesticide-class instances. PLACEHOLDER values for efficacy/selection_pressure,
+        // see comment above pesticide_choice. cost is anchored to real Vietnamese retail
+        // prices (see pesticide_class comment below). selection_pressure unused in phase_1
+        // (no resistance ratchet here; carried for symmetry with phase_2's pesticide_class).
+        create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; resurgence_type <- "none";   selection_pressure <- 0.015; cost <- 110.6; }
+        create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; resurgence_type <- "chronic"; selection_pressure <- 0.025; cost <- 100.0; }
     }
 
     // reset the spray marker each cycle; Farmer sets it to 1 when a spray fires
@@ -173,6 +181,10 @@ species pesticide_class {
     float  efficacy;
     string resurgence_type;
     float  selection_pressure;
+    // Per-spray cost, same scale as spray_cost=100. See phase_2.gaml's pesticide_class
+    // for the full real-price derivation (Trebon 10EC / Actara 25WG, June 2026, MRD
+    // retail prices, label doses confirmed for brown planthopper on rice).
+    float  cost;
 }
 
 // ===========================================================================
@@ -331,6 +343,14 @@ species Plot {
         last_spray_count <- spray_count;
         write "Day " + cycle + " | Season " + season + ": harvested. Strategy=" + farmer_strategy + ". Grain=" + (grain_tha with_precision 2) + "t/ha. PestLoss=" + (yield_loss_tha with_precision 2) + "t/ha. Sprays=" + spray_count + ". Money=" + (farmer_money with_precision 0) + ".";
 
+        // active compound's cost, for the cost_per_spray CSV column below. pesticide_choice
+        // is fixed for the whole run, so this mirrors the lookup in Farmer.decide_spray.
+        float logged_cost <- spray_cost;
+        if (pesticide_choice != "starfarm") {
+            pesticide_class pcc <- pesticide_class first_with (each.name = pesticide_choice);
+            if (pcc != nil) { logged_cost <- pcc.cost; }
+        }
+
         // compute revenue from grain yield at the current grain price
         // grain_price is an arbitrary placeholder unit, relative rankings are meaningful, absolute values are not
         float revenue <- grain_tha * grain_price;
@@ -340,7 +360,7 @@ species Plot {
         if (batch_mode) {
             float end_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
             string hrow <- "" + run_id + "," + farmer_strategy + "," + season + ","
-                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money + "\n";
+                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money + "," + logged_cost + "\n";
             save hrow to: "harvest_output.csv" format: "text" rewrite: false;
         }
 
@@ -354,8 +374,26 @@ species Plot {
                 if (pc2 != nil) { logged_efficacy <- pc2.efficacy; }
             }
             string srow <- "" + run_id + "," + farmer_strategy + "," + logged_efficacy + "," + pest_daily_increment + "," + season + ","
-                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money2 + "\n";
+                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money2 + "," + logged_cost + "\n";
             save srow to: "sensitivity_output.csv" format: "text" rewrite: false;
+        }
+
+        // log interval-sweep summary (Task 1, added June 29 2026): how spray count
+        // and yield change across different calendar_interval values
+        if (interval_sweep_mode) {
+            float end_money3 <- empty(Farmer) ? 0.0 : first(Farmer).money;
+            string irow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + season + ","
+                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money3 + "," + logged_cost + "\n";
+            save irow to: "sensitivity_output_interval.csv" format: "text" rewrite: false;
+        }
+
+        // log threshold-sweep summary (Task 1, added June 29 2026): how spray count
+        // and yield change across different pesticide_threshold values
+        if (threshold_sweep_mode) {
+            float end_money4 <- empty(Farmer) ? 0.0 : first(Farmer).money;
+            string trow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + ","
+                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money4 + "," + logged_cost + "\n";
+            save trow to: "sensitivity_output_threshold.csv" format: "text" rewrite: false;
         }
 
         // remove the crop agent from the simulation, it has served its purpose
@@ -408,11 +446,12 @@ species Farmer {
         if (should_spray) {
 		    float pest_before <- the_plot.pest_load;  // snapshot pest_load before spraying for the console log
 
-		    // active compound's efficacy (starfarm = unchanged global)
+		    // active compound's efficacy and cost (starfarm = unchanged globals)
 		    float active_efficacy <- efficacy;
+		    float active_cost <- spray_cost;
 		    if (pesticide_choice != "starfarm") {
 		        pesticide_class pc <- pesticide_class first_with (each.name = pesticide_choice);
-		        if (pc != nil) { active_efficacy <- pc.efficacy; }
+		        if (pc != nil) { active_efficacy <- pc.efficacy; active_cost <- pc.cost; }
 		    }
 
 		    // apply the spray: reduce pest_load by the active efficacy fraction
@@ -420,7 +459,7 @@ species Farmer {
 		    the_plot.pest_load <- the_plot.pest_load * (1.0 - active_efficacy);
 		    the_plot.days_since_last_spray <- 0;      // reset the cooldown counter
 		    the_plot.spray_count <- the_plot.spray_count + 1;  // increment this plot's spray count for the season
-		    money <- money - spray_cost;              // deduct spray cost from the farmer's money
+		    money <- money - active_cost;              // deduct spray cost from the farmer's money, compound-specific
 
 		    // flag that a spray happened this cycle, used by the Pest pressure chart
 	    	world.spray_event_p1 <- 1;
@@ -513,13 +552,13 @@ experiment FarmerDecision type: gui {
 // BATCH: one row per harvest (season) per run -> harvest_output.csv
 // runs each strategy `repeat` times with different seeds (flip variance)
 // ===========================================================================
-experiment Batch_Harvest type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Batch_Harvest type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode      among: [true];
 
     init {
         // header once + clears old file (auto-handles the delete-CSV step)
-        save "run_id,strategy,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "harvest_output.csv" format: "text" rewrite: true;
     }
 }
@@ -531,53 +570,53 @@ experiment Batch_Harvest type: batch repeat: 15 keep_seed: false until: season >
 // so results never mix; rename/move sensitivity_output.csv between runs
 // or it will be overwritten by the next sweep experiment's init.
 // ===========================================================================
-experiment Sweep_Efficacy_06 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Efficacy_06 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode      among: [true];
     parameter "Sweep mode" var: sweep_mode      among: [true];
     parameter "efficacy"   var: efficacy        among: [0.6];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
 
 // Run #2 of 4 -- efficacy=0.9.
-experiment Sweep_Efficacy_09 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Efficacy_09 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode      among: [true];
     parameter "Sweep mode" var: sweep_mode      among: [true];
     parameter "efficacy"   var: efficacy        among: [0.9];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
 
 // Run #3 of 4 -- pest_daily_increment=0.05.
-experiment Sweep_Increment_05 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Increment_05 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy      among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode           among: [true];
     parameter "Sweep mode" var: sweep_mode           among: [true];
     parameter "increment"  var: pest_daily_increment among: [0.05];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
 
 // Run #4 of 4 -- pest_daily_increment=0.10.
-experiment Sweep_Increment_10 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Increment_10 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy      among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode           among: [true];
     parameter "Sweep mode" var: sweep_mode           among: [true];
     parameter "increment"  var: pest_daily_increment among: [0.10];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
@@ -587,26 +626,26 @@ experiment Sweep_Increment_10 type: batch repeat: 15 keep_seed: false until: sea
 // placeholder values, see pesticide_choice comment in global{}. Separate CSV
 // per compound, same pattern as Sweep_Efficacy_*
 // ===========================================================================
-experiment Sweep_Pesticide_Etofenprox type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Pesticide_Etofenprox type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"         var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode"       var: batch_mode      among: [true];
     parameter "Sweep mode"       var: sweep_mode      among: [true];
     parameter "Pesticide class"  var: pesticide_choice among: ["etofenprox"];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
 
-experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"         var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode"       var: batch_mode      among: [true];
     parameter "Sweep mode"       var: sweep_mode      among: [true];
     parameter "Pesticide class"  var: pesticide_choice among: ["neonicotinoid"];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
@@ -619,26 +658,58 @@ experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 15 keep_seed: false
 // season-over-season profit decline (driven by resistance eroding efficacy)
 // is sensitive to the cost assumption or robust regardless of it.
 // ===========================================================================
-experiment Sweep_SprayCost_50 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_SprayCost_50 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"    var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode"  var: batch_mode      among: [true];
     parameter "Sweep mode"  var: sweep_mode      among: [true];
     parameter "spray_cost"  var: spray_cost      among: [50.0];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
     }
 }
 
-experiment Sweep_SprayCost_150 type: batch repeat: 15 keep_seed: false until: season > max_seasons {
+experiment Sweep_SprayCost_150 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"    var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode"  var: batch_mode      among: [true];
     parameter "Sweep mode"  var: sweep_mode      among: [true];
     parameter "spray_cost"  var: spray_cost      among: [150.0];
 
     init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money\n"
+        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
              to: "sensitivity_output.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// SWEEP: calendar interval and pesticide threshold (Task 1, added June 29 2026).
+// Each writes its own dedicated CSV, so there is no rename step needed between
+// the two runs, unlike the pesticide-class sweeps above. Strategy is held fixed
+// per experiment since the swept parameter only matters for that one strategy:
+// calendar_interval only affects "calendar", pesticide_threshold only affects
+// "threshold".
+// ===========================================================================
+experiment Sweep_CalendarInterval type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"            var: farmer_strategy      among: ["calendar"];
+    parameter "Batch mode"          var: batch_mode           among: [true];
+    parameter "Interval sweep mode" var: interval_sweep_mode  among: [true];
+    parameter "calendar_interval"   var: calendar_interval    among: [7, 10, 14, 21, 28];
+
+    init {
+        save "run_id,strategy,calendar_interval,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
+             to: "sensitivity_output_interval.csv" format: "text" rewrite: true;
+    }
+}
+
+experiment Sweep_Threshold type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"             var: farmer_strategy        among: ["threshold"];
+    parameter "Batch mode"           var: batch_mode             among: [true];
+    parameter "Threshold sweep mode" var: threshold_sweep_mode   among: [true];
+    parameter "pesticide_threshold"  var: pesticide_threshold    among: [0.1, 0.2, 0.3, 0.4, 0.5];
+
+    init {
+        save "run_id,strategy,pesticide_threshold,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
+             to: "sensitivity_output_threshold.csv" format: "text" rewrite: true;
     }
 }
