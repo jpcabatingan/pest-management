@@ -14,7 +14,7 @@
  *   Farmer  : decide_spray reflex -- dispatches none / calendar / threshold
  *
  * Strategies:
- *   "none"      - never spray (baseline: 43.75% yield loss at defaults, cultivars.csv OM5451)
+ *   "none"      - never spray (baseline: ~45% yield loss at defaults across 3 seasons, harvest_output.csv)
  *   "calendar"  - spray every calendar_interval days regardless of pest_load
  *   "threshold" - spray when pest_load > pesticide_threshold AND cooldown elapsed
  *
@@ -53,30 +53,24 @@ global {
     float pest_temp_limit      <- 27.0;
     float pest_infection_prob  <- 0.8;
     float pest_daily_increment <- 0.03;
-    // ---- Life-table-derived proportional growth term (added June 22 2026) ----
+    // ---- Life-table-derived proportional growth term ----
     // rm = 0.0677/female/day (Win et al. 2011, Table 3); female_fraction = 0.488
-    // (Win et al. 2011: sex ratio M:F = 0.512:0.488; supervisor-approved June 22 2026
-    // to apply only the female fraction as reproducers).
+    // (Win et al. 2011: sex ratio M:F = 0.512:0.488; female fraction only as reproducers).
     // pest_growth_rate = rm * female_fraction = 0.0677 * 0.488 = 0.033038
     // Update mechanism: pest_load += pest_daily_increment + (pest_load * pest_growth_rate)
-    // Keeps the existing flat term (handles cold-start at pest_load=0, matches
-    // STAR-FARM's lua_mdModel structure) and adds a proportional term so growth
-    // scales with current pest_load, addressing the linear-vs-exponential gap
-    // flagged in tab1.md S2.1. NOT a new equation: same additive update, one
-    // extra multiplicative term using a literature-sourced rate.
-    // TODO: update tab3.md (D3 design decisions, global var table, OPEN
-    // CALIBRATION ITEMS, tab1.md S2.1 model implication) to document this change.
+    // The flat term handles cold-start at pest_load=0; the proportional term scales
+    // growth with current pest_load using a literature-sourced rate.
     float pest_growth_rate     <- 0.033038;
     
-	// stage_weight
-	// 		--> to address stage-specific damage
-	//		--> using placeholder values inherited from STAR-FARM fAPAR values but rearranged to fit literature findings
-    float sw_phase1 <- 0.2;
-    float sw_phase2 <- 0.9;
-    float sw_phase3 <- 0.7;
-    float sw_phase4 <- 0.4;
+	// stage_weight: stage-specific pest damage sensitivity
+	// Values follow Horgan et al. (2018) direction: highest during emergence, lowest during grain fill
+	// 0.7/0.6/0.5/0.3: placeholder values pending calibration
+    float sw_phase1 <- 0.7;
+    float sw_phase2 <- 0.6;
+    float sw_phase3 <- 0.5;
+    float sw_phase4 <- 0.3;
     
-    // pending value references; inherited from STAR-FARM's Parameters.gaml pollution_decay_rate	
+    // placeholder value; inherited from STAR-FARM's Parameters.gaml pest_decay_coeff	
     float pest_decay_coeff <- 0.9;
 
     // ---- Phenological thresholds ------------------------------------
@@ -109,29 +103,23 @@ global {
     float  initial_money       <- 5000.0;  // farmer starting budget; placeholder
     float grain_price <- 3000.0; // arbitrary; placeholder for VND/kg calibration
 
-    // ---- Per-pesticide-class parameterization (added June 23 2026, UNCALIBRATED) ----
-    // "starfarm" = current global efficacy/selection_pressure_constant behavior, unchanged.
-    // "etofenprox"/"neonicotinoid" values below are PLACEHOLDERS for proposed structure only,
-    // ordering reflects qualitative Khoa et al. 2018 claims (etofenprox lower resistance/resurgence
-    // risk), not measured rates. Do not cite these numbers anywhere.
+    // ---- Per-pesticide-class parameterization (UNCALIBRATED) ----
+    // "starfarm" = global efficacy/selection_pressure_constant behavior, unchanged.
+    // "etofenprox"/"neonicotinoid" values are PLACEHOLDERS for proposed structure only:
+    // ordering reflects qualitative Khoa et al. (2018) claims (etofenprox lower resistance/resurgence
+    // risk), not measured rates. Do not cite these numbers.
     string pesticide_choice <- "starfarm" among: ["starfarm", "etofenprox", "neonicotinoid"];
 
     // ---- Spray event marker (spikes the Pest pressure chart on a spray) -------
     int spray_event_p1 <- 0;
 
-    // ---- Last-harvest snapshot (read by Sensitivity_Sweep batch experiment) ---
-    float last_grain_tha   <- 0.0;  // grain yield t/ha of most recent harvest
-    int   last_spray_count <- 0;    // spray count of most recent harvested season
-
     // ---- Batch infrastructure -----------------------------------------------
     bool   batch_mode <- false;   // true only in batch; gates harvest CSV, pause, daily log
     string run_id     <- "";      // unique per simulation
-    bool   sweep_mode <- false;   // true only in the 4 Sweep_* experiments; gates sensitivity_output.csv writes
+    bool   sweep_mode <- false;   // true only in the 8 Sweep_* experiments; gates sweep output to per-config CSVs
 
-    // ---- Interval / threshold sweep gates (added June 29 2026) ----
-    // Task 1: how does grain yield and spray count change across different
-    // calendar_interval values, and across different pesticide_threshold values?
-    // Each gate writes its own CSV, so there is no rename step needed between runs.
+    // ---- Interval / threshold sweep gates ----
+    // Each gate writes its own CSV so results never mix between runs.
     bool   interval_sweep_mode  <- false;  // true only in Sweep_CalendarInterval; gates sensitivity_output_interval.csv
     bool   threshold_sweep_mode <- false;  // true only in Sweep_Threshold; gates sensitivity_output_threshold.csv
 
@@ -147,8 +135,8 @@ global {
         // see comment above pesticide_choice. cost is anchored to real Vietnamese retail
         // prices (see pesticide_class comment below). selection_pressure unused in phase_1
         // (no resistance ratchet here; carried for symmetry with phase_2's pesticide_class).
-        create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; resurgence_type <- "none";   selection_pressure <- 0.015; cost <- 110.6; }
-        create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; resurgence_type <- "chronic"; selection_pressure <- 0.025; cost <- 100.0; }
+        create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; selection_pressure <- 0.015; cost <- 110.6; }
+        create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; selection_pressure <- 0.025; cost <- 100.0; }
     }
 
     // reset the spray marker each cycle; Farmer sets it to 1 when a spray fires
@@ -172,17 +160,16 @@ global {
 }
 
 // ===========================================================================
-// pesticide_class: per-compound parameterization (added June 23 2026, UNCALIBRATED).
+// pesticide_class: per-compound parameterization (UNCALIBRATED).
 // See pesticide_choice comment in global{} for sourcing caveat.
 // ===========================================================================
 
 species pesticide_class {
     string name;
     float  efficacy;
-    string resurgence_type;
     float  selection_pressure;
     // Per-spray cost, same scale as spray_cost=100. See phase_2.gaml's pesticide_class
-    // for the full real-price derivation (Trebon 10EC / Actara 25WG, June 2026, MRD
+    // for the full real-price derivation (Trebon 10EC / Actara 25WG, MRD
     // retail prices, label doses confirmed for brown planthopper on rice).
     float  cost;
 }
@@ -223,7 +210,7 @@ species Crop {
 
         // select stage_weight based on current growth stage
         // stage_weight controls how sensitive the crop is to pest damage at each phase
-        // highest during vegetative (sw_phase2=0.9), lowest during grain fill (sw_phase4=0.4)
+        // highest during emergence (sw_phase1=0.7), lowest during grain fill (sw_phase4=0.3)
         float stage_weight <- sw_phase1;
         if      (thermal_time < emergence_threshold) { stage_weight <- sw_phase1; }
         else if (thermal_time < flowering_threshold) { stage_weight <- sw_phase2; }
@@ -266,7 +253,7 @@ species Plot {
     int   days_since_last_spray <- 0;   // resets to 0 after each spray and at sowing
     int   spray_count         <- 0;     // total sprays this season
 
-    // ---- Daily-log indicators (added June 23 2026) ----
+    // ---- Daily-log indicators ----
     float cumulative_pest_exposure <- 0.0;  // running sum of daily pest_load across the season
     int   days_above_threshold     <- 0;    // running count of days pest_load > pesticide_threshold
 
@@ -339,8 +326,6 @@ species Plot {
         float yield_loss_tha <- associated_crop.pest_yield_loss * harvest_index * biomass_to_ton_conv;
 
         float farmer_money   <- empty(Farmer) ? 0.0 : first(Farmer).money;
-        last_grain_tha   <- grain_tha;     // snapshot before the crop dies, so the batch can read it
-        last_spray_count <- spray_count;
         write "Day " + cycle + " | Season " + season + ": harvested. Strategy=" + farmer_strategy + ". Grain=" + (grain_tha with_precision 2) + "t/ha. PestLoss=" + (yield_loss_tha with_precision 2) + "t/ha. Sprays=" + spray_count + ". Money=" + (farmer_money with_precision 0) + ".";
 
         // active compound's cost, for the cost_per_spray CSV column below. pesticide_choice
@@ -356,8 +341,10 @@ species Plot {
         float revenue <- grain_tha * grain_price;
 		ask Farmer { money <- money + revenue; }
 
-        // log harvest summary to harvest_output.csv, one row per season per run
-        if (batch_mode) {
+        // log harvest summary to harvest_output.csv, one row per season per run.
+        // excluded from sweep runs (sweep_mode/interval_sweep_mode/threshold_sweep_mode)
+        // so sweep experiments don't also pollute this file.
+        if (batch_mode and not sweep_mode and not interval_sweep_mode and not threshold_sweep_mode) {
             float end_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
             string hrow <- "" + run_id + "," + farmer_strategy + "," + season + ","
                          + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money + "," + logged_cost + "\n";
@@ -373,13 +360,23 @@ species Plot {
                 pesticide_class pc2 <- pesticide_class first_with (each.name = pesticide_choice);
                 if (pc2 != nil) { logged_efficacy <- pc2.efficacy; }
             }
+            // filename encodes the swept configuration so no manual rename is needed.
+            // pattern: sensitivity_output_<compound>_eff<efficacy>_inc<increment>_cost<cost>.csv
+            string sweep_file <- "sensitivity_output_" + pesticide_choice
+                              + "_eff" + int(logged_efficacy * 100)
+                              + "_inc" + int(pest_daily_increment * 100)
+                              + "_cost" + int(logged_cost) + ".csv";
+            // write header once on the first season of the first run
+            if (season = 1 and run_id = (farmer_strategy + "_0")) {
+                save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
+                     to: sweep_file format: "text" rewrite: true;
+            }
             string srow <- "" + run_id + "," + farmer_strategy + "," + logged_efficacy + "," + pest_daily_increment + "," + season + ","
                          + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + end_money2 + "," + logged_cost + "\n";
-            save srow to: "sensitivity_output.csv" format: "text" rewrite: false;
+            save srow to: sweep_file format: "text" rewrite: false;
         }
 
-        // log interval-sweep summary (Task 1, added June 29 2026): how spray count
-        // and yield change across different calendar_interval values
+        // log interval-sweep summary: spray count and yield across calendar_interval values
         if (interval_sweep_mode) {
             float end_money3 <- empty(Farmer) ? 0.0 : first(Farmer).money;
             string irow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + season + ","
@@ -387,8 +384,7 @@ species Plot {
             save irow to: "sensitivity_output_interval.csv" format: "text" rewrite: false;
         }
 
-        // log threshold-sweep summary (Task 1, added June 29 2026): how spray count
-        // and yield change across different pesticide_threshold values
+        // log threshold-sweep summary: spray count and yield across pesticide_threshold values
         if (threshold_sweep_mode) {
             float end_money4 <- empty(Farmer) ? 0.0 : first(Farmer).money;
             string trow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + ","
@@ -433,7 +429,10 @@ species Farmer {
 
         // spray decision depends on the current strategy:
         // none      - never spray
-        // calendar  - spray whenever the fixed interval has elapsed, ignoring pest levels
+        // calendar  - spray whenever the fixed interval has elapsed, ignoring pest levels.
+        //             NOTE: calendar does NOT check spray_cooldown. At interval=1 it can
+        //             spray ~75 times/season (every day). This is an undocumented asymmetry
+        //             vs threshold, which respects spray_cooldown as a binding constraint.
         // threshold - spray only when cooldown is satisfied AND pest_load exceeds the threshold
         if (farmer_strategy = "none") {
             should_spray <- false;
@@ -566,20 +565,13 @@ experiment Batch_Harvest type: batch repeat: 40 keep_seed: false until: season >
 // ===========================================================================
 // SWEEP: one-at-a-time sensitivity sweep, run #1 of 4 -- efficacy=0.6
 // all other params at model default (pest_daily_increment=0.03, threshold=0.3)
-// crosses with all 3 strategies, repeat 15 each. Separate CSV per sweep value
-// so results never mix; rename/move sensitivity_output.csv between runs
-// or it will be overwritten by the next sweep experiment's init.
+// crosses with all 3 strategies. Separate CSV per sweep value so results never mix.
 // ===========================================================================
 experiment Sweep_Efficacy_06 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"   var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode" var: batch_mode      among: [true];
     parameter "Sweep mode" var: sweep_mode      among: [true];
     parameter "efficacy"   var: efficacy        among: [0.6];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // Run #2 of 4 -- efficacy=0.9.
@@ -588,11 +580,6 @@ experiment Sweep_Efficacy_09 type: batch repeat: 40 keep_seed: false until: seas
     parameter "Batch mode" var: batch_mode      among: [true];
     parameter "Sweep mode" var: sweep_mode      among: [true];
     parameter "efficacy"   var: efficacy        among: [0.9];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // Run #3 of 4 -- pest_daily_increment=0.05.
@@ -601,11 +588,6 @@ experiment Sweep_Increment_05 type: batch repeat: 40 keep_seed: false until: sea
     parameter "Batch mode" var: batch_mode           among: [true];
     parameter "Sweep mode" var: sweep_mode           among: [true];
     parameter "increment"  var: pest_daily_increment among: [0.05];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // Run #4 of 4 -- pest_daily_increment=0.10.
@@ -614,15 +596,10 @@ experiment Sweep_Increment_10 type: batch repeat: 40 keep_seed: false until: sea
     parameter "Batch mode" var: batch_mode           among: [true];
     parameter "Sweep mode" var: sweep_mode           among: [true];
     parameter "increment"  var: pest_daily_increment among: [0.10];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // ===========================================================================
-// SWEEP: per-pesticide-class comparison sweeps (added June 23 2026). UNCALIBRATED
+// SWEEP: per-pesticide-class comparison sweeps (UNCALIBRATED)
 // placeholder values, see pesticide_choice comment in global{}. Separate CSV
 // per compound, same pattern as Sweep_Efficacy_*
 // ===========================================================================
@@ -631,11 +608,6 @@ experiment Sweep_Pesticide_Etofenprox type: batch repeat: 40 keep_seed: false un
     parameter "Batch mode"       var: batch_mode      among: [true];
     parameter "Sweep mode"       var: sweep_mode      among: [true];
     parameter "Pesticide class"  var: pesticide_choice among: ["etofenprox"];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 40 keep_seed: false until: season > max_seasons {
@@ -643,31 +615,19 @@ experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 40 keep_seed: false
     parameter "Batch mode"       var: batch_mode      among: [true];
     parameter "Sweep mode"       var: sweep_mode      among: [true];
     parameter "Pesticide class"  var: pesticide_choice among: ["neonicotinoid"];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // ===========================================================================
-// SWEEP: spray_cost sensitivity sweep (added June 23 2026). Bracket 50/150 around
-// the current placeholder default of 100. spray_cost doesn't change spray
-// decisions (threshold/calendar don't check cost), but changes net profit
-// outcomes for a fixed spray pattern -- tests whether the existing
-// season-over-season profit decline (driven by resistance eroding efficacy)
-// is sensitive to the cost assumption or robust regardless of it.
+// SWEEP: spray_cost sensitivity sweep — bracket 50/150 around the default of 100.
+// Spray_cost does not change spray decisions (threshold/calendar do not check cost),
+// but changes net profit outcomes for a fixed spray pattern. Phase 1 has no resistance
+// ratchet, so profit differences across cost levels are purely financial, not behavioral.
 // ===========================================================================
 experiment Sweep_SprayCost_50 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"    var: farmer_strategy among: ["none", "calendar", "threshold"];
     parameter "Batch mode"  var: batch_mode      among: [true];
     parameter "Sweep mode"  var: sweep_mode      among: [true];
     parameter "spray_cost"  var: spray_cost      among: [50.0];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 experiment Sweep_SprayCost_150 type: batch repeat: 40 keep_seed: false until: season > max_seasons {
@@ -675,20 +635,14 @@ experiment Sweep_SprayCost_150 type: batch repeat: 40 keep_seed: false until: se
     parameter "Batch mode"  var: batch_mode      among: [true];
     parameter "Sweep mode"  var: sweep_mode      among: [true];
     parameter "spray_cost"  var: spray_cost      among: [150.0];
-
-    init {
-        save "run_id,strategy,efficacy,increment,season,grain_tha,pest_loss_tha,spray_count,end_money,cost_per_spray\n"
-             to: "sensitivity_output.csv" format: "text" rewrite: true;
-    }
 }
 
 // ===========================================================================
-// SWEEP: calendar interval and pesticide threshold (Task 1, added June 29 2026).
-// Each writes its own dedicated CSV, so there is no rename step needed between
-// the two runs, unlike the pesticide-class sweeps above. Strategy is held fixed
-// per experiment since the swept parameter only matters for that one strategy:
-// calendar_interval only affects "calendar", pesticide_threshold only affects
-// "threshold".
+// SWEEP: calendar interval and pesticide threshold.
+// Each writes its own dedicated CSV so results never mix between runs.
+// Strategy is held fixed per experiment since the swept parameter only matters
+// for that strategy: calendar_interval affects "calendar" only,
+// pesticide_threshold affects "threshold" only.
 // ===========================================================================
 experiment Sweep_CalendarInterval type: batch repeat: 40 keep_seed: false until: season > max_seasons {
     parameter "Strategy"            var: farmer_strategy      among: ["calendar"];
