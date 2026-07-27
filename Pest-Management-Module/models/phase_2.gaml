@@ -23,7 +23,7 @@
  *              the rendering differs. The original continuous heatmap is kept as
  *              a second display ("Pest map (raw)") for side-by-side comparison.
  *
- * Author: Joanne Maryz Cabatingan (visuals scaffold)
+ * Author: Joanne Maryz Cabatingan
  */
 
 model phase_2
@@ -40,7 +40,7 @@ global {
 
     // ---- Crop growth -------------------------------------------------
     float potential_rue <- 0.768;  // OM5451: RUE (1.2) * rue_efficiency_factor (0.64), cultivars.csv
-    
+
     // inherited from STAR-FARM's Parameters.gaml
     float fAPAR_phase1  <- 0.2;
     float fAPAR_phase2  <- 0.7;
@@ -53,6 +53,7 @@ global {
     float pest_temp_limit      <- 27.0;
     float pest_infection_prob  <- 0.8;
     float pest_daily_increment <- 0.03;
+    
     // ---- Life-table-derived proportional growth term ----
     // rm = 0.0677/female/day (Win et al. 2011, Table 3); female_fraction = 0.488
     // (Win et al. 2011: sex ratio M:F = 0.512:0.488; female fraction only as reproducers).
@@ -61,14 +62,14 @@ global {
     // The flat term handles cold-start at pest_load=0; the proportional term scales
     // growth with current pest_load using a literature-sourced rate.
     float pest_growth_rate     <- 0.033038;
-    
+
 	// placeholder values: literature supports damage ranking but not actual values
 
     float sw_phase1 <- 0.7;
     float sw_phase2 <- 0.6;
     float sw_phase3 <- 0.5;
     float sw_phase4 <- 0.3;
-    
+
     float pest_decay_coeff <- 0.9;
 
     // ---- Phenological thresholds ------------------------------------
@@ -93,20 +94,20 @@ global {
     int    spray_cooldown      <- 7; 						// placeholder
     int    calendar_interval   <- 14;  						// literature-backed
     float  efficacy            <- 0.8;  					// placeholder
-    
-	// farmer money    
+
+	// farmer money
     float  spray_cost          <- 100.0;					// placeholder
     float  initial_money       <- 5000.0;					// placeholder
     float grain_price <- 3000.0; 							// arbitrary units per t/ha; placeholder for VND/kg calibration
-    
+
     // to track what events happened for reference to other graphs
     int spray_event   <- 0;  								// 1 on any cycle where any plot is sprayed, else 0
 	int harvest_event <- 0;  								// 1 on the cycle harvest occurs, else 0
 
     // ---- Phase 2 extended parameters ------------------------------------------
-	// placeholders    
+	// placeholders
     float diffusion_prop              <- 0.1;
-    float selection_pressure_constant <- 0.02; 
+    float selection_pressure_constant <- 0.02;
 
     // ---- Per-pesticide-class parameterization (UNCALIBRATED) ----
     // "starfarm" = global efficacy/selection_pressure_constant behavior, unchanged.
@@ -169,6 +170,24 @@ global {
     // PLACEHOLDER: not empirically calibrated. Set to 0.0 for no decay.
     float  immigration_rate <- 0.05;
 
+    // ---- Resistance decay via fitness cost (UNCALIBRATED) ----
+    // Distinct mechanism from immigration_rate above. immigration_rate dilutes RF
+    // with susceptible individuals arriving FROM OUTSIDE the grid. This term instead
+    // models an INTRINSIC decline in the resistant allele's frequency even with zero
+    // immigration, because resistant individuals carry a fitness cost and are
+    // out-competed by susceptible individuals already in the local population.
+    // Literature: Yu et al. (2018) found that under density pressure, susceptible
+    // N. lugens individuals (HZ-S) outcompeted imidacloprid-resistant individuals
+    // (HZ-R, RR 227.10) from the same source population: a direct fitness-cost
+    // finding, confirmed via abstract (see tab1_Pesticide Practices & Risk.md Section 3).
+    // Applied once per season boundary, same point as immigration decay, but
+    // multiplicatively independent so the two mechanisms can be swept separately:
+    // resistant_fraction *= (1 - immigration_rate) * (1 - resistance_fitness_cost).
+    // Default 0.0 = off (matches pre-existing behavior when this parameter is unused).
+    // PLACEHOLDER: no per-season fitness-cost rate is available in the literature found;
+    // Yu (2018) establishes the mechanism qualitatively, not a decay rate.
+    float  resistance_fitness_cost <- 0.0;
+
     // ---- Cross-resistance spillover (PLACEHOLDER) ----
     // When > 0.0, a fraction of the other compound's resistant_fraction spills over
     // into the effective resistance for this compound's spray. 0.0 = no cross-resistance
@@ -187,6 +206,26 @@ global {
     bool   rotation_mode       <- false;
     string rotation_compound_a <- "etofenprox";
     string rotation_compound_b <- "neonicotinoid";
+
+    // ---- Compound sequence sweep (farmer-adaptation exploration) ----
+    // Generalizes rotation_mode beyond strict A-B alternation. rotation_pattern is a
+    // string over {A, B} that repeats every length(rotation_pattern) seasons: 'A' maps
+    // to rotation_compound_a, 'B' to rotation_compound_b. Default "AB" reproduces the
+    // exact old odd/even alternation (season-boundary logic below), so existing
+    // experiments (Batch_Rotation_Grid, Sweep_CalendarInterval_Grid_Rotation,
+    // Sweep_Threshold_Grid_Rotation) are unaffected by this change.
+    // Special value "REACTIVE" switches from a fixed pattern to a non-deterministic
+    // rule: at each season boundary, spray whichever compound's grid-mean
+    // resistant_fraction pool is currently lower. This is a simple greedy
+    // farmer-adaptation policy, not a fixed schedule; the choice depends on
+    // simulation state.
+    // ASSUMES rotation_compound_a="etofenprox" and rotation_compound_b="neonicotinoid"
+    // (true for every experiment using this so far); the REACTIVE branch hardcodes the
+    // rf_etofenprox/rf_neonicotinoid pool lookup accordingly rather than doing a
+    // generic name-based lookup.
+    string rotation_pattern    <- "AB";
+    bool   sequence_sweep_mode_calendar  <- false;  // true only in Sweep_CompoundSequence_Grid_Calendar
+    bool   sequence_sweep_mode_threshold <- false;  // true only in Sweep_CompoundSequence_Grid_Threshold
 
     // ---- Farmer heterogeneity (PLACEHOLDER distributions) ----
     // When heterogeneous_mode=true, each plot is independently assigned a strategy
@@ -207,6 +246,123 @@ global {
     // Uses starfarm compound, 30 seasons, all 3 strategies.
     bool   sweep_immigration_mode <- false;  // true only in Sweep_Immigration_Grid
 
+    // ---- Extended immigration rate sweep gate ----
+    // Covers the high range [0.30, 0.50, 0.70, 0.90, 1.00] that Sweep_Immigration_Rate
+    // does not, to find the rate above which resistance never fixates. Writes to a
+    // separate CSV so the existing 0.0-0.20 data in sensitivity_output_immigration_grid.csv
+    // is not overwritten.
+    bool   sweep_immigration_mode_extended <- false;  // true only in Sweep_Immigration_Rate_Extended
+
+    // ---- Resistance decay (fitness cost) sweep gate ----
+    // Varies resistance_fitness_cost independently of immigration_rate, to look for a
+    // long-term stability "sweet spot" (season-to-season profit stability).
+    // immigration_rate held at its default (0.05) so the decay term's effect can
+    // be isolated.
+    bool   sweep_decay_mode <- false;  // true only in Sweep_ResistanceDecay_Grid
+
+    // ---- Interval/threshold x immigration_rate sweep gates ----
+    // Answers "spray-delay threshold as a function of dilution rate": neither
+    // existing sweep crosses spray timing with immigration_rate directly.
+    // Sweep_CalendarInterval_Grid fixes immigration_rate at 0.05, and
+    // Sweep_Immigration_Rate_Extended fixes the interval at its default. These
+    // two experiments cross them properly. Single compound (starfarm/Default),
+    // no rotation.
+    bool   interval_immigration_sweep_mode  <- false;  // true only in Sweep_Interval_Immigration_Grid
+    bool   threshold_immigration_sweep_mode <- false;  // true only in Sweep_Threshold_Immigration_Grid
+
+    // ---- Rotation x interval / threshold sweep gates ----
+    // Combines rotation_mode with the existing calendar_interval / pesticide_threshold
+    // sweeps, which previously only ran with pesticide_choice fixed (no rotation).
+    // Answers "how many days, what threshold, under rotation."
+    bool   interval_sweep_mode_rotation  <- false;  // true only in Sweep_CalendarInterval_Grid_Rotation
+    bool   threshold_sweep_mode_rotation <- false;  // true only in Sweep_Threshold_Grid_Rotation
+
+    // ---- Adaptive farmer: profit-triggered backoff + REACTIVE compound choice ----
+    // Answers "can we do both REACTIVE and strategy-level switching?" -- yes, they are
+    // independent: REACTIVE (above) decides pesticide_choice; this decides whether/how hard
+    // to keep spraying (calendar_interval / pesticide_threshold). Both fire at the same
+    // season boundary without conflict, since they set different variables.
+    // Trigger: profit-based, chosen over a resistance-fraction trigger because it matches
+    // the project's profit-maximization priority and is what a real farmer would notice.
+    // Response: continuous backoff (lengthen interval / raise threshold), not a categorical
+    // strategy swap -- monotonic, never re-tightens even if profit later recovers.
+    bool  adaptive_profit_mode       <- false;  // true = this run's farmer eases off on declining profit
+    bool  adaptive_farmer_sweep_mode <- false;  // true only in Sweep_AdaptiveFarmer_Grid (CSV-routing gate)
+
+    // ---- Adaptive-backoff x immigration_rate coverage gap ----
+    // Backoff (above) was only ever tested at the default immigration_rate=0.05.
+    // Does backoff still add value once immigration_rate is already high enough to
+    // help resistance on its own, or is its benefit specific to the low-immigration
+    // regime? rotation_mode pinned false here (no REACTIVE) to isolate backoff alone,
+    // strategy pinned to calendar (where backoff's effect was cleanest).
+    // Own dedicated gate, not reused from adaptive_farmer_sweep_mode, since the CSV
+    // shape differs (immigration_rate column added, rotation_reactive column dropped).
+    bool  adaptive_farmer_immigration_sweep_mode <- false;  // true only in Sweep_AdaptiveFarmer_Immigration_Grid
+
+    // ---- Long-horizon confirmation of the standout no-fixation finding ----
+    // The main Adaptive Farmer Sweep found calendar + REACTIVE + backoff never reaches
+    // RF=0.99 within 30 seasons at the default immigration_rate (final RF=0.825, still
+    // climbing). That's ambiguous: does it genuinely plateau below fixation, or does it
+    // just take longer than 30 seasons to get there? This experiment re-runs that one
+    // standout condition alone, at n=40 (confirmatory, not screening) and max_seasons=60
+    // (double the horizon) to tell the difference. Own dedicated gate + CSV, does not
+    // touch sensitivity_output_adaptive_farmer_grid.csv (would collide with the
+    // already-verified 8-condition dataset otherwise).
+    bool  adaptive_farmer_longhorizon_mode <- false;  // true only in Sweep_AdaptiveFarmer_LongHorizon
+
+    // ---- Backoff x plain rotation (AB), not REACTIVE ----
+    // The main Adaptive Farmer Sweep only ever combined backoff with REACTIVE
+    // (adaptive compound choice), never with plain fixed A/B alternation
+    // (rotation_mode=true, rotation_pattern="AB", the mechanism tested standalone
+    // in Batch_Rotation_Grid). Does backoff's benefit generalize to a simpler,
+    // non-adaptive rotation schedule, or is it specific to REACTIVE's adaptive
+    // compound choice? Own dedicated gate + CSV, since the existing
+    // adaptive_farmer_sweep_mode gate always pins rotation_pattern to "REACTIVE"
+    // when rotation_mode is true, this experiment pins it to "AB" instead.
+    bool  adaptive_farmer_rotation_sweep_mode <- false;  // true only in Sweep_AdaptiveFarmer_Rotation_Grid
+    float last_season_money          <- 0.0;    // Farmer.money recorded at the previous season boundary
+    float prev_season_profit         <- 0.0;    // profit realized in the season before last, for comparison
+    int   backoff_interval_step      <- 2;      // days added to calendar_interval per declining-profit season (int: calendar_interval is int)
+    float backoff_threshold_step     <- 0.05;   // added to pesticide_threshold per declining-profit season
+    int   backoff_interval_cap       <- 28;     // cap at the longest interval already tested elsewhere
+    float backoff_threshold_cap      <- 0.5;    // cap at the highest threshold already tested elsewhere
+
+    // Escalation: mirror of the backoff mechanism above, testing the
+    // opposite hypothesis. Literature review (farmer behavior under perceived pesticide
+    // resistance) found real farmers often respond to declining performance by spraying
+    // MORE, not less -- the reverse of the backoff assumption. Same trigger (this season's
+    // profit fell short of the last), same step sizes, but tightens instead of loosens,
+    // floored at the shortest interval / lowest threshold already tested elsewhere (rather
+    // than backoff's cap at the longest/highest). Mutually exclusive with adaptive_profit_mode
+    // in practice -- never swept true together in the same experiment.
+    bool  adaptive_escalate_mode        <- false;  // true = this run's farmer sprays harder on declining profit
+    bool  adaptive_escalate_sweep_mode  <- false;  // true only in Sweep_AdaptiveFarmer_Escalate_Grid (CSV-routing gate)
+    int   escalate_interval_floor       <- 1;      // floor at the shortest interval already tested elsewhere
+    float escalate_threshold_floor      <- 0.1;    // floor at the lowest threshold already tested elsewhere
+
+    // Categorical strategy swap: a bigger farmer-adaptation mechanism, tested
+    // as its own pair of experiments alongside backoff/escalation. Where
+    // backoff/escalation adjust *how hard* a farmer sprays
+    // within their current strategy, this swaps the farmer's entire strategy
+    // family -- calendar -> threshold -> none -> calendar -- when triggered.
+    // Two independent trigger definitions are tested as separate experiments, not
+    // composed together: profit-based (same shortfall trigger as backoff/escalation)
+    // and resistance-based (tab4 Section 3 sketch: "if resistant_fraction > 0.5,
+    // switch"). Reversible: unlike backoff/escalation's one-way cap/floor, the
+    // cycle keeps advancing every time the trigger fires again, so a farmer can
+    // complete a full loop back to their starting strategy. Standalone mechanism
+    // (not composed with backoff/escalation, and not crossed with rotation/REACTIVE)
+    // to keep the comparison clean -- mirrors how escalation was kept separate
+    // from backoff. Mutually exclusive with adaptive_profit_mode/adaptive_escalate_mode
+    // in practice; reuses last_season_money/prev_season_profit the same way those
+    // two already do for its own profit-trigger variant.
+    bool  adaptive_strategyswap_profit_mode     <- false;  // true = profit-shortfall trigger variant
+    bool  adaptive_strategyswap_resistance_mode <- false;  // true = resistance-threshold trigger variant
+    bool  strategyswap_profit_sweep_mode        <- false;  // true only in Sweep_StrategySwap_Profit_Grid (CSV-routing gate)
+    bool  strategyswap_resistance_sweep_mode    <- false;  // true only in Sweep_StrategySwap_Resistance_Grid (CSV-routing gate)
+    float strategyswap_resistance_threshold     <- 0.5;    // grid-mean resistant_fraction level that triggers a swap (tab4 Sec.3 sketch value)
+    int   strategyswap_count                    <- 0;      // lifetime count of swaps so far this run, logged per row for trajectory analysis
+
     // ---- Spatial position breakdown ----
     // Classifies each plot as corner / edge / interior based on grid position.
     // Corner plots have 3 Moore neighbors, edge plots 5, interior plots 8.
@@ -226,6 +382,26 @@ global {
         create pesticide_class { name <- "etofenprox";   efficacy <- 0.7; selection_pressure <- 0.015; cost <- 110.6; }
         create pesticide_class { name <- "neonicotinoid"; efficacy <- 0.8; selection_pressure <- 0.025; cost <- 100.0; }
 
+        // Seed season-1 pesticide_choice when rotation is active.
+        // Moved here from each experiment's own init{} block: GAMA batch experiments'
+        // init{} runs before that instance's swept parameters are bound, so reading a
+        // swept variable (like rotation_pattern) there silently returns its class-
+        // declared default, not the actual value for this run. Confirmed bug: all 21
+        // compound-sequence patterns showed identical season-1 pesticide_choice
+        // regardless of intended starting compound. This global init IS per-instance
+        // and runs after parameter binding, so it seeds correctly. Single unified rule
+        // replaces the six separate (and silently non-functional) per-experiment seed
+        // lines that used to live in Batch_Rotation_Grid, Sweep_CalendarInterval_Grid_
+        // Rotation, Sweep_Threshold_Grid_Rotation, Sweep_CompoundSequence_Grid_Calendar/
+        // Threshold, and Sweep_AdaptiveFarmer_Grid.
+        if (rotation_mode) {
+            if (rotation_pattern != "REACTIVE" and copy_between(rotation_pattern, 0, 1) = "B") {
+                pesticide_choice <- rotation_compound_b;
+            } else {
+                pesticide_choice <- rotation_compound_a;
+            }
+        }
+
         // classify each plot's spatial position once at init (static across seasons).
         // corner: both x and y are on the border -> 3 Moore neighbors
         // edge:   one of x or y is on the border (but not both) -> 5 Moore neighbors
@@ -238,7 +414,7 @@ global {
             else                                  { plot_position <- "interior"; }
         }
     }
-    
+
     reflex reset_events {
 	    spray_event   <- 0;
 	    harvest_event <- 0;
@@ -246,16 +422,16 @@ global {
 
     // ---- Pest dynamics: generation + diffusion --------
     reflex pest_step {
-    	
+
         // Pass 1: generation
         // each plot independently generates new pest pressure based on local conditions.
         ask Plot where (each.associated_crop != nil) {
-        	
+
         	// determine if this plot is a valid pest source
 	        // if localized_infection=true, only the outbreak center generates pest
 	        // if false, all plots can generate pest independently
             bool is_source <- (not localized_infection) or (grid_x = outbreak_cx and grid_y = outbreak_cy);
-            
+
             // three conditions must all pass before pest_load increments:
 	        // 		1. This plot is a valid source (is_source)
 	        // 		2. Humidity exceeds the minimum threshold for BPH activity  (humidity > pest_humidity_limit)
@@ -265,39 +441,39 @@ global {
             if (is_source and humidity > pest_humidity_limit and t_mean > pest_temp_limit and flip(pest_infection_prob)) {
                 pest_load <- pest_load + pest_daily_increment + (pest_load * pest_growth_rate);
             }
-            
+
             // pest_load is a normalized scalar, not a population count.
             pest_load <- min(1.0, pest_load);
         }
-        
+
         // Pass 2: emigrate into neighbours' tmp buffers
         // 		- each plot donates a fraction of its pest_load to neighbors
 	    // 		- incoming amounts are staged in pest_load_tmp, NOT written directly to pest_load
 	    // 		- this ensures all plots read from the same starting state this cycle,
 	    // 				preventing order-dependent artifacts where early-updated plots spread further than late ones.
-        ask Plot {	
+        ask Plot {
             if (pest_load > 0.0 and diffusion_prop > 0.0) {
                 list<Plot> nbrs <- self.neighbors;
                 if (not empty(nbrs)) {
                     // total amount to donate is a fixed proportion of current pest_load.
 	                float to_share <- pest_load * diffusion_prop;
-	                
+
 	                // split equally across all neighbors (Moore: up to 8).
 	                // edge and corner plots have fewer neighbors, so each neighbor receives more.
 	                float share_each <- to_share / length(nbrs);
-	                
+
 	                // subtract the donated amount from the source plot immediately.
 	                pest_load <- pest_load - to_share;
-	                
+
 	                // write incoming amounts to each neighbor's tmp buffer, not pest_load directly.
-	                // this is the synchronization mechanism — buffers are committed in Pass 3.
+	                // this is the synchronization mechanism; buffers are committed in Pass 3.
 	                ask nbrs {
 	                    pest_load_tmp <- pest_load_tmp + share_each;
 	                }
                 }
             }
         }
-        
+
         // Pass 3: commit incoming migrants
         // 		all plots simultaneously absorb the pest pressure that arrived this cycle.
 	    // 		separating this from Pass 2 guarantees synchronous update:
@@ -305,7 +481,7 @@ global {
         ask Plot {
         	// add buffered incoming pest to current pest_load.
             pest_load <- min(1.0, pest_load + pest_load_tmp);
-            
+
             // reset buffer to zero, ready for the next cycle.
             pest_load_tmp <- 0.0;
         }
@@ -317,26 +493,26 @@ global {
 	// uses first_with to check the condition without looping over all plots
 	reflex manage_harvest when: (Plot first_with (each.associated_crop != nil)) != nil
 	        and (Plot first_with (each.associated_crop != nil)).associated_crop.thermal_time >= maturity_threshold {
-	
+
 	    // harvest every plot that still has a living crop attached
 	    ask Plot where (each.associated_crop != nil) {
-	    
+
 	        // convert accumulated biomass to grain yield in tonnes per hectare
 	        // harvest_index is the fraction of total biomass that becomes grain
 	        // biomass_to_ton_conv scales from g/m2 to t/ha
 	        float grain_tha <- associated_crop.biomass * harvest_index * biomass_to_ton_conv;
-	        
+
 	        // convert accumulated pest damage to yield loss in the same units
 	        // pest_yield_loss tracks the biomass that was lost to pests each day
 	        float yield_loss_tha <- associated_crop.pest_yield_loss * harvest_index * biomass_to_ton_conv;
-	        
+
 	        // compute revenue from grain yield at the current grain price
 	        // grain_price is an arbitrary placeholder unit-relative rankings are meaningful, absolute values are not
 	        float revenue <- grain_tha * grain_price;
-	        
+
 	        // pay the farmer. money accumulates across seasons
 	        ask Farmer { money <- money + revenue; }
-	        
+
 	        // log per-plot harvest summary to the console
 	        // includes grain, pest loss, spray count, revenue, and resistance level at harvest
 	        if (not batch_mode) {
@@ -345,9 +521,7 @@ global {
 	            + ". Revenue=" + (revenue with_precision 0)
 	            + ". resist=" + (resistant_fraction with_precision 3);
 	        }
-	        
-        // Fires only when no sweep/experiment gate is active, so harvest_grid_output.csv
-        // stays the clean output of Batch_Harvest_Grid alone.
+
         // Records the active compound's cost for cost_per_spray; reads plot_pesticide
         // (per-plot in heterogeneous_mode, mirrors pesticide_choice otherwise).
 	        float logged_cost <- spray_cost;
@@ -356,143 +530,392 @@ global {
 	        if (pcc != nil) { logged_cost <- pcc.cost; }
 	        }
 
-	        if (batch_mode and not (interval_sweep_mode or threshold_sweep_mode
-	                or threshold_sweep_mode_etofenprox or threshold_sweep_mode_neonic
-	                or compound_baseline_etofenprox or compound_baseline_neonic
-	                or longterm_mode or rotation_mode or heterogeneous_mode
-	                or log_plot_position)) {
+	        // ===================================================================
+	        // CSV routing: single if/else-if chain.
+	        //
+	        // Previously each destination CSV had its own independent, unconditional
+	        // `if (gate) { save ... }` block, and harvest_grid_output.csv's block used
+	        // a hand-maintained "and not (all other gates)" exclusion list. Every new
+	        // experiment gate had to be remembered and added to that list, or its rows
+	        // would silently bleed into harvest_grid_output.csv too. This is exactly
+	        // what happened: Sweep_Immigration_Rate was never added, and 600,000 of its
+	        // rows ended up mixed into harvest_grid_output.csv (confirmed: 636,000 rows
+	        // on disk vs 36,000 expected for Batch_Harvest_Grid alone). The same bleed
+	        // was about to recur for harvest_grid_output_rotation.csv once the new
+	        // rotation x interval/threshold sweeps were added, since both also set
+	        // rotation_mode=true.
+	        //
+	        // An if/else-if chain makes that whole bug class structurally impossible:
+	        // exactly one branch can fire per row (the first whose gate is true), no
+	        // matter how many booleans happen to be true at once, and no exclusion list
+	        // needs to exist or be kept up to date. Adding a new experiment just means
+	        // adding one more `else if` branch; it can never silently double-write.
+	        //
+	        // Ordering rule: the two rotation-sub-sweep branches (interval/threshold x
+	        // rotation) are checked BEFORE the plain rotation_mode branch, since both
+	        // also set rotation_mode=true. Being earlier in the chain means they win,
+	        // so the plain rotation branch only ever fires for Batch_Rotation_Grid itself.
+	        // The bare harvest_grid_output.csv write is the final `else`, so it now fires
+	        // exactly when batch_mode=true and none of the other gates matched; no
+	        // exclusion list to maintain, ever.
+	        // ===================================================================
+
+	        if (interval_sweep_mode) {
+	            // log interval-sweep summary: same shape as harvest_grid_output.csv plus
+	            // calendar_interval, tracking resistant_fraction per season per interval
+	            string irow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save irow to: "sensitivity_output_interval_grid.csv" format: "text" rewrite: false;
+
+	        } else if (threshold_sweep_mode) {
+	            // log threshold-sweep summary: same shape, for pesticide_threshold
+	            string trow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save trow to: "sensitivity_output_threshold_grid.csv" format: "text" rewrite: false;
+
+	        } else if (threshold_sweep_mode_etofenprox) {
+	            // log per-compound threshold-sweep: pesticide_choice fixed to a specific compound
+	            // so spray cadence and resistance reflect that compound's efficacy and selection_pressure
+	            string terow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save terow to: "sensitivity_output_threshold_grid_etofenprox.csv" format: "text" rewrite: false;
+
+	        } else if (threshold_sweep_mode_neonic) {
+	            string tnrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save tnrow to: "sensitivity_output_threshold_grid_neonic.csv" format: "text" rewrite: false;
+
+	        } else if (compound_baseline_etofenprox) {
+	            // log compound-baseline: same shape as harvest_grid_output.csv, run with
+	            // pesticide_choice fixed to etofenprox or neonicotinoid
+	            string berow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save berow to: "harvest_grid_output_etofenprox.csv" format: "text" rewrite: false;
+
+	        } else if (compound_baseline_neonic) {
+	            string bnrow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save bnrow to: "harvest_grid_output_neonic.csv" format: "text" rewrite: false;
+
+	        } else if (longterm_mode) {
+	            // log long-term run summary: same shape as harvest_grid_output.csv plus
+	            // pesticide_choice column so one CSV covers all 3 compounds
+	            string ltrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save ltrow to: "harvest_grid_output_longterm.csv" format: "text" rewrite: false;
+
+	        } else if (interval_sweep_mode_rotation) {
+	            // log rotation x interval sweep: calendar_interval + pesticide_choice
+	            // both recorded, since rotation flips pesticide_choice at season boundaries.
+	            // Checked before the plain rotation_mode branch (see ordering rule above).
+	            string irrow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save irrow to: "sensitivity_output_interval_grid_rotation.csv" format: "text" rewrite: false;
+
+	        } else if (threshold_sweep_mode_rotation) {
+	            // log rotation x threshold sweep: pesticide_threshold + pesticide_choice
+	            // both recorded, same reasoning as above. Also checked before plain rotation_mode.
+	            string trrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save trrow to: "sensitivity_output_threshold_grid_rotation.csv" format: "text" rewrite: false;
+
+	        } else if (sequence_sweep_mode_calendar or sequence_sweep_mode_threshold) {
+	            // log compound-sequence sweep: rotation_pattern + pesticide_choice
+	            // both recorded, since the pattern (or "REACTIVE") determines which compound
+	            // is active each season. Checked before the plain rotation_mode branch, since
+	            // this also sets rotation_mode=true (see ordering rule above).
+	            // Routed to strategy-specific files (not a shared file) so each experiment's
+	            // own rewrite:true init does not collide with the other's header row.
+	            // Each experiment checks its own dedicated gate directly rather than
+	            // routing off farmer_strategy's value: farmer_strategy is pinned constant
+	            // per experiment here, but keying routing off a value that could in
+	            // principle be swept within an experiment is a risky shape (see the
+	            // strategy-swap routing note below), so a per-experiment gate is used
+	            // consistently instead.
+	            string seqrow <- "" + run_id + "," + farmer_strategy + "," + rotation_pattern + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            if (sequence_sweep_mode_calendar) {
+	                save seqrow to: "sensitivity_output_compound_sequence_grid_calendar.csv" format: "text" rewrite: false;
+	            } else {
+	                save seqrow to: "sensitivity_output_compound_sequence_grid_threshold.csv" format: "text" rewrite: false;
+	            }
+
+	        } else if (adaptive_farmer_sweep_mode) {
+	            // log adaptive-farmer sweep: both the profit-backoff toggle
+	            // (adaptive_profit_mode) and whether REACTIVE compound-choice is layered
+	            // on top (rotation_mode true = REACTIVE active, since rotation_pattern is
+	            // fixed to "REACTIVE" for every run of this experiment) are recorded.
+	            // calendar_interval/pesticide_threshold are logged live since
+	            // adaptive_profit_mode may have changed them mid-run -- that trajectory is
+	            // the whole point of this sweep. Checked before the plain rotation_mode
+	            // branch, since some rows here also have rotation_mode=true.
+	            string afrow <- "" + run_id + "," + farmer_strategy + "," + adaptive_profit_mode + "," + rotation_mode + "," + calendar_interval + "," + pesticide_threshold + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save afrow to: "sensitivity_output_adaptive_farmer_grid.csv" format: "text" rewrite: false;
+
+	        } else if (adaptive_farmer_immigration_sweep_mode) {
+	            // log adaptive-backoff x immigration_rate coverage-gap sweep:
+	            // tests whether backoff still helps once immigration_rate is already
+	            // substantial, not just at the default 0.05. rotation_mode pinned false
+	            // for every run of this experiment (isolating backoff alone), so no
+	            // rotation_reactive column here, unlike adaptive_farmer_sweep_mode's row
+	            // shape. Checked before adaptive_farmer_sweep_mode's own branch would be
+	            // reached, own dedicated gate, no collision possible.
+	            string afirow <- "" + run_id + "," + farmer_strategy + "," + adaptive_profit_mode + "," + immigration_rate + "," + calendar_interval + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save afirow to: "sensitivity_output_adaptive_farmer_immigration_grid.csv" format: "text" rewrite: false;
+
+	        } else if (adaptive_farmer_longhorizon_mode) {
+	            // log long-horizon confirmation run: the single standout
+	            // calendar + REACTIVE + backoff condition, run at n=40 and
+	            // max_seasons=60 to check whether it genuinely plateaus below fixation
+	            // or just takes longer than 30 seasons to get there. Own dedicated
+	            // gate + file, kept separate from sensitivity_output_adaptive_farmer_grid.csv
+	            // so this does not collide with the already-verified 8-condition
+	            // dataset. Row shape matches adaptive_farmer_sweep_mode's (rotation_reactive
+	            // included, since REACTIVE is pinned true for every run of this experiment).
+	            string alhrow <- "" + run_id + "," + farmer_strategy + "," + adaptive_profit_mode + "," + rotation_mode + "," + calendar_interval + "," + pesticide_threshold + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save alhrow to: "sensitivity_output_adaptive_farmer_longhorizon.csv" format: "text" rewrite: false;
+
+	        } else if (adaptive_farmer_rotation_sweep_mode) {
+	            // log backoff x plain-rotation (AB) coverage-gap sweep: tests
+	            // whether backoff's benefit generalizes to fixed A/B alternation, not
+	            // just REACTIVE's adaptive compound choice. rotation_mode here means
+	            // plain AB rotation (rotation_pattern pinned "AB" for this experiment),
+	            // unlike adaptive_farmer_sweep_mode's rotation_mode which always means
+	            // REACTIVE. Own dedicated gate, checked before the plain rotation_mode
+	            // branch since some rows here also have rotation_mode=true.
+	            string arrow <- "" + run_id + "," + farmer_strategy + "," + adaptive_profit_mode + "," + rotation_mode + "," + calendar_interval + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save arrow to: "sensitivity_output_adaptive_farmer_rotation_grid.csv" format: "text" rewrite: false;
+
+	        } else if (adaptive_escalate_sweep_mode) {
+	            // log adaptive-farmer escalate sweep: mirror of the
+	            // adaptive_farmer_sweep_mode branch above, but for adaptive_escalate_mode
+	            // instead of adaptive_profit_mode -- tests the literature-documented
+	            // "spray harder under perceived resistance" hypothesis as an alternative to
+	            // the backoff assumption. Same column shape, separate file since it is a
+	            // separate experiment. Checked before the plain rotation_mode branch, since
+	            // some rows here also have rotation_mode=true.
+	            string aerow <- "" + run_id + "," + farmer_strategy + "," + adaptive_escalate_mode + "," + rotation_mode + "," + calendar_interval + "," + pesticide_threshold + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save aerow to: "sensitivity_output_adaptive_farmer_escalate_grid.csv" format: "text" rewrite: false;
+
+	        } else if (strategyswap_profit_sweep_mode or strategyswap_resistance_sweep_mode) {
+	            // log categorical strategy-swap sweep: farmer_strategy itself is
+	            // mutable mid-run (calendar -> threshold -> none -> calendar), so it
+	            // is logged live each row, same reasoning as calendar_interval /
+	            // pesticide_threshold in the backoff/escalate branches above.
+	            // strategyswap_count gives the trajectory of how many swaps have
+	            // happened so far -- the main new thing this experiment reveals.
+	            // Routed to trigger-specific files (not a shared file) so each
+	            // experiment's own rewrite:true init does not collide with the other's
+	            // header row; same reasoning as the compound-sequence branch above.
+	            // Routing keys off which experiment is running (its own sweep-mode
+	            // gate), not off adaptive_strategyswap_resistance_mode's value: that
+	            // value is itself swept true/false within the resistance experiment,
+	            // so keying on it would misroute that experiment's false-condition
+	            // rows into the profit file.
+	            string ssrow <- "" + run_id + "," + farmer_strategy + "," + adaptive_strategyswap_profit_mode + "," + adaptive_strategyswap_resistance_mode + "," + strategyswap_count + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            if (strategyswap_resistance_sweep_mode) {
+	                save ssrow to: "sensitivity_output_strategyswap_grid_resistance.csv" format: "text" rewrite: false;
+	            } else {
+	                save ssrow to: "sensitivity_output_strategyswap_grid_profit.csv" format: "text" rewrite: false;
+	            }
+
+	        } else if (rotation_mode) {
+	            // log rotation run summary: same shape as harvest_grid_output_longterm.csv.
+	            // pesticide_choice reflects the compound active this season (already flipped
+	            // at the previous season boundary). Only reaches here for Batch_Rotation_Grid
+	            // itself, since the rotation-sub-sweep branches (interval, threshold, and
+	            // compound-sequence) are all checked earlier.
+	            string rtrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save rtrow to: "harvest_grid_output_rotation.csv" format: "text" rewrite: false;
+
+	        } else if (heterogeneous_mode) {
+	            // log heterogeneous run summary: adds plot_strategy and plot_pesticide columns
+	            // so each row records the individual plot's assignment, not the global defaults
+	            string htrow <- "" + run_id + "," + plot_strategy + "," + plot_pesticide + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save htrow to: "harvest_grid_output_heterogeneous.csv" format: "text" rewrite: false;
+
+	        } else if (log_plot_position) {
+	            // log spatial breakdown: adds plot_position column so results can be grouped
+	            // by corner / edge / interior
+	            string sprow <- "" + run_id + "," + farmer_strategy + "," + plot_position + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save sprow to: "harvest_grid_output_spatial.csv" format: "text" rewrite: false;
+
+	        } else if (sweep_immigration_mode) {
+	            // log immigration sweep summary: each row includes immigration_rate so
+	            // per-season RF decay strength is recorded
+	            string imrow <- "" + run_id + "," + farmer_strategy + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save imrow to: "sensitivity_output_immigration_grid.csv" format: "text" rewrite: false;
+
+	        } else if (sweep_immigration_mode_extended) {
+	            // log extended immigration sweep (high range): separate file, same shape.
+	            string imexrow <- "" + run_id + "," + farmer_strategy + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save imexrow to: "sensitivity_output_immigration_grid_extended.csv" format: "text" rewrite: false;
+
+	        } else if (sweep_decay_mode) {
+	            // log resistance-decay (fitness cost) sweep: each row includes
+	            // resistance_fitness_cost so the season-to-season profit stability sweet spot
+	            // can be identified.
+	            string decrow <- "" + run_id + "," + farmer_strategy + "," + resistance_fitness_cost + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save decrow to: "sensitivity_output_decay_grid.csv" format: "text" rewrite: false;
+
+	        } else if (interval_immigration_sweep_mode) {
+	            // log interval x immigration_rate cross-sweep: both swept columns
+	            // recorded so spray-delay-vs-dilution-rate can be read directly.
+	            string iirow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save iirow to: "sensitivity_output_interval_immigration_grid.csv" format: "text" rewrite: false;
+
+	        } else if (threshold_immigration_sweep_mode) {
+	            // log threshold x immigration_rate cross-sweep: same reasoning,
+	            // for the threshold strategy.
+	            string tirow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save tirow to: "sensitivity_output_threshold_immigration_grid.csv" format: "text" rewrite: false;
+
+	        } else if (batch_mode) {
+	            // Default: Batch_Harvest_Grid, and only Batch_Harvest_Grid, since every other
+	            // experiment's gate is checked above and would have already matched.
 	            string hrow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
 	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
 	            save hrow to: "harvest_grid_output.csv" format: "text" rewrite: false;
 	        }
-
-        // log interval-sweep summary: same shape as harvest_grid_output.csv plus
-        // calendar_interval, tracking resistant_fraction per season per interval
-        if (interval_sweep_mode) {
-	            string irow <- "" + run_id + "," + farmer_strategy + "," + calendar_interval + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save irow to: "sensitivity_output_interval_grid.csv" format: "text" rewrite: false;
-	        }
-
-        // log threshold-sweep summary: same shape, for pesticide_threshold
-        if (threshold_sweep_mode) {
-	            string trow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save trow to: "sensitivity_output_threshold_grid.csv" format: "text" rewrite: false;
-	        }
-
-        // log per-compound threshold-sweep: pesticide_choice fixed to a specific compound
-        // so spray cadence and resistance reflect that compound's efficacy and selection_pressure
-        if (threshold_sweep_mode_etofenprox) {
-	            string terow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save terow to: "sensitivity_output_threshold_grid_etofenprox.csv" format: "text" rewrite: false;
-	        }
-
-	        if (threshold_sweep_mode_neonic) {
-	            string tnrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save tnrow to: "sensitivity_output_threshold_grid_neonic.csv" format: "text" rewrite: false;
-	        }
-
-        // log compound-baseline: same shape as harvest_grid_output.csv, run with
-        // pesticide_choice fixed to etofenprox or neonicotinoid
-        if (compound_baseline_etofenprox) {
-	            string berow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save berow to: "harvest_grid_output_etofenprox.csv" format: "text" rewrite: false;
-	        }
-
-	        if (compound_baseline_neonic) {
-	            string bnrow <- "" + run_id + "," + farmer_strategy + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save bnrow to: "harvest_grid_output_neonic.csv" format: "text" rewrite: false;
-	        }
-
-        // log long-term run summary: same shape as harvest_grid_output.csv plus
-        // pesticide_choice column so one CSV covers all 3 compounds
-        if (longterm_mode) {
-	         string ltrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
-	         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	         save ltrow to: "harvest_grid_output_longterm.csv" format: "text" rewrite: false;
-	         }
-
-        // log rotation run summary: same shape as harvest_grid_output_longterm.csv.
-        // pesticide_choice reflects the compound active this season (already flipped
-        // at the previous season boundary).
-        if (rotation_mode) {
-	            string rtrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save rtrow to: "harvest_grid_output_rotation.csv" format: "text" rewrite: false;
-	        }
-
-        // log heterogeneous run summary: adds plot_strategy and plot_pesticide columns
-        // so each row records the individual plot's assignment, not the global defaults
-        if (heterogeneous_mode) {
-	            string htrow <- "" + run_id + "," + plot_strategy + "," + plot_pesticide + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save htrow to: "harvest_grid_output_heterogeneous.csv" format: "text" rewrite: false;
-	        }
-
-        // log spatial breakdown: adds plot_position column so results can be grouped
-        // by corner / edge / interior
-        if (log_plot_position) {
-	            string sprow <- "" + run_id + "," + farmer_strategy + "," + plot_position + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save sprow to: "harvest_grid_output_spatial.csv" format: "text" rewrite: false;
-	        }
-
-        // log immigration sweep summary: each row includes immigration_rate so
-        // per-season RF decay strength is recorded
-        if (sweep_immigration_mode) {
-	            string imrow <- "" + run_id + "," + farmer_strategy + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
-	            save imrow to: "sensitivity_output_immigration_grid.csv" format: "text" rewrite: false;
-	        }
+	        // GUI runs (batch_mode=false) fall through with no CSV write, as before.
 
 	        // remove the crop agent from the simulation. it has served its purpose
 	        ask associated_crop { do die; }
-	        
+
 	        // detach the crop reference from this plot so the plot is ready to sow again
 	        associated_crop <- nil;
 	    }
-	
+
 	    // read the farmer's total money after all plot revenues have been added
 	    // the empty check guards against the farmer agent not existing
 	    float farmer_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
-	    
+
 	    // log the season-level summary to the console.
 	    if (not batch_mode) {
 	    write "Day " + cycle + " | Season " + season + " harvested. Strategy=" + farmer_strategy
 	        + ". Money=" + (farmer_money with_precision 0) + ".";
 	    }
-	
+
 	    // advance the season counter
 	    season <- season + 1;
-	    
+
 	    // flag that a harvest happened this cycle, used by the events chart to place a harvest marker
 	    harvest_event <- 1;
-	    
+
 	    // if more seasons remain, flag all plots to sow a new crop next cycle
 	    if (season <= max_seasons) {
-        // apply inter-season resistance decay via immigration: a fraction (immigration_rate)
-        // of the local pest population is replaced by susceptible immigrants, reducing RF.
-        // Fires once per season boundary. immigration_rate=0.0 = no decay.
+        // apply inter-season resistance decay: two independent multiplicative terms.
+        // immigration_rate: external dilution by susceptible immigrants arriving from
+        //   outside the grid (Daly et al. 1988; Choi et al. 2025 for MRD source-population context).
+        // resistance_fitness_cost: intrinsic decline from resistant individuals being
+        //   out-competed by susceptible individuals already present (Yu et al. 2018).
+        // Fires once per season boundary. Both default such that 0.0 = no decay from that term.
         // Both pools decay independently (per-compound pools).
-        if (immigration_rate > 0.0) {
+        if (immigration_rate > 0.0 or resistance_fitness_cost > 0.0) {
             ask Plot {
-                rf_etofenprox <- rf_etofenprox * (1.0 - immigration_rate);
-                rf_neonicotinoid <- rf_neonicotinoid * (1.0 - immigration_rate);
+                rf_etofenprox <- rf_etofenprox * (1.0 - immigration_rate) * (1.0 - resistance_fitness_cost);
+                rf_neonicotinoid <- rf_neonicotinoid * (1.0 - immigration_rate) * (1.0 - resistance_fitness_cost);
                 // sync backward-compat field: effective RF = max of both pools at season boundary
                 resistant_fraction <- max(rf_etofenprox, rf_neonicotinoid);
             }
         }
-        // rotation: alternate pesticide_choice at every season boundary.
-        // Odd seasons use compound_a, even seasons use compound_b.
-        // pesticide_choice is a global, so flipping it affects all plots next season.
+        // rotation: update pesticide_choice at every season boundary.
+        // pesticide_choice is a global, so this affects all plots next season.
         // season has already been incremented, so the new value is used to decide.
 	        if (rotation_mode) {
-	            pesticide_choice <- (season mod 2 = 1) ? rotation_compound_a : rotation_compound_b;
+	            if (rotation_pattern = "REACTIVE") {
+	                // Non-deterministic: spray whichever compound's grid-mean pool is
+	                // currently lower. At season 1 both pools are 0.0 (tie), which
+	                // defaults to rotation_compound_a below.
+	                float mean_rf_a <- mean(Plot collect each.rf_etofenprox);
+	                float mean_rf_b <- mean(Plot collect each.rf_neonicotinoid);
+	                pesticide_choice <- (mean_rf_b < mean_rf_a) ? rotation_compound_b : rotation_compound_a;
+	            } else {
+	                // Fixed pattern: cycle through rotation_pattern's characters by season.
+	                // Default "AB" reproduces the old odd=compound_a / even=compound_b
+	                // behavior exactly (index 0 -> 'A' on season 1, index 1 -> 'B' on
+	                // season 2, index 0 -> 'A' on season 3, ...).
+	                int pat_len <- length(rotation_pattern);
+	                int idx <- (season - 1) mod pat_len;
+	                string ch <- copy_between(rotation_pattern, idx, idx + 1);
+	                pesticide_choice <- (ch = "B") ? rotation_compound_b : rotation_compound_a;
+	            }
+	        }
+	        // Adaptive profit-based backoff: a farmer who notices this season's
+	        // profit fell short of the previous season's eases off -- lengthening
+	        // calendar_interval or raising pesticide_threshold -- rather than continuing
+	        // to spray at an increasingly unprofitable rate. Independent of the rotation
+	        // block above: this decides whether/how hard to keep spraying, REACTIVE (if
+	        // active) separately decides which compound. Monotonic: once eased off, never
+	        // re-tightens even if profit later recovers ("burned once, more cautious going
+	        // forward", tab4 Section 3 framing). Capped at the longest interval / highest
+	        // threshold already validated elsewhere in this document, so backoff never
+	        // wanders into untested territory.
+	        if (adaptive_profit_mode or adaptive_escalate_mode) {
+	            float current_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
+	            float this_season_profit <- current_money - last_season_money;
+	            if (this_season_profit < prev_season_profit) {
+	                if (adaptive_profit_mode) {
+	                    if (farmer_strategy = "calendar" and calendar_interval < backoff_interval_cap) {
+	                        calendar_interval <- min(backoff_interval_cap, calendar_interval + backoff_interval_step);
+	                    } else if (farmer_strategy = "threshold" and pesticide_threshold < backoff_threshold_cap) {
+	                        pesticide_threshold <- min(backoff_threshold_cap, pesticide_threshold + backoff_threshold_step);
+	                    }
+	                } else if (adaptive_escalate_mode) {
+	                    // Mirror of the backoff branch above: same step sizes, but tightens
+	                    // (sprays harder) instead of loosening, floored instead of capped.
+	                    if (farmer_strategy = "calendar" and calendar_interval > escalate_interval_floor) {
+	                        calendar_interval <- max(escalate_interval_floor, calendar_interval - backoff_interval_step);
+	                    } else if (farmer_strategy = "threshold" and pesticide_threshold > escalate_threshold_floor) {
+	                        pesticide_threshold <- max(escalate_threshold_floor, pesticide_threshold - backoff_threshold_step);
+	                    }
+	                }
+	            }
+	            prev_season_profit <- this_season_profit;
+	            last_season_money <- current_money;
+	        }
+	        // Categorical strategy swap: mirrors the block above's
+	        // season-boundary timing, but swaps farmer_strategy itself instead of
+	        // tuning a parameter within it. Two mutually-exclusive trigger variants,
+	        // never both true in the same run. Reversible cycle: calendar -> threshold
+	        // -> none -> calendar, one step per trigger firing, with no cap/floor --
+	        // a farmer can complete a full loop back to where they started.
+	        if (adaptive_strategyswap_profit_mode or adaptive_strategyswap_resistance_mode) {
+	            bool swap_triggered <- false;
+	            if (adaptive_strategyswap_profit_mode) {
+	                float current_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
+	                float this_season_profit <- current_money - last_season_money;
+	                swap_triggered <- (this_season_profit < prev_season_profit);
+	                prev_season_profit <- this_season_profit;
+	                last_season_money <- current_money;
+	            } else if (adaptive_strategyswap_resistance_mode) {
+	                float grid_mean_rf <- mean(Plot collect each.resistant_fraction);
+	                swap_triggered <- (grid_mean_rf > strategyswap_resistance_threshold);
+	            }
+	            if (swap_triggered) {
+	                if (farmer_strategy = "calendar") {
+	                    farmer_strategy <- "threshold";
+	                } else if (farmer_strategy = "threshold") {
+	                    farmer_strategy <- "none";
+	                } else {
+	                    farmer_strategy <- "calendar";
+	                }
+	                strategyswap_count <- strategyswap_count + 1;
+	            }
 	        }
 	        ask Plot { pending_sow <- true; }
 	    }
@@ -510,17 +933,17 @@ global {
     // pest_hunting model uses to keep its sprite count matching the formula).
 	reflex sync_bph_visuals when: not batch_mode {
 	    ask Plot {
-	    
+
 	        // figure out how many bph sprites this plot should have
 	        // scales pest_load (0 to 1) up to a max sprite count
 	        int target <- round(pest_load * max_bph_per_plot);
-	        
+
 	        // get the list of bph sprites currently assigned to this plot
 	        list<Bph> mine <- Bph where (each.home = self);
-	        
+
 	        // compare how many we have vs how many we need
 	        int diff <- target - length(mine);
-	        
+
 	        // if we need more sprites, create the missing ones
 	        // assign them to this plot and place them at a random spot within it
 	        if (diff > 0) {
@@ -528,14 +951,14 @@ global {
 	                home <- myself;
 	                location <- any_location_in(myself.shape);
 	            }
-	        
+
 	        // if we have too many sprites, remove the excess ones
 	        } else if (diff < 0) {
 	            ask (-diff) among mine {
 	                do die;
 	            }
 	        }
-	        
+
 	        // if diff = 0, nothing changes
 	    }
 	}
@@ -557,10 +980,8 @@ species pesticide_class {
     //     -> 196,875 VND/ha/spray
     //   neonicotinoid (Actara 25WG, thiamethoxam): 593,300 VND / 100g packet, label dose 30g/ha
     //     -> 177,990 VND/ha/spray
-    // Ratio (etofenprox:neonicotinoid) = 1.106. Neonicotinoid anchored at 100 to match the
-    // model's existing spray_cost default; etofenprox scaled by the same ratio.
-    // starfarm keeps using the global spray_cost (100), unchanged, since it has no real
-    // compound to anchor to.
+    // Ratio etofenprox:neonicotinoid = 1.106, neonicotinoid anchored at 100 (= spray_cost default).
+    // starfarm uses global spray_cost directly.
     float  cost;
 }
 
@@ -571,7 +992,7 @@ species pesticide_class {
 species Crop {
     Plot myPlot <- nil; 	// the plot this crop is growing on
     float biomass <- 0.0; 	// total accumulated dry matter in g/m2
-    float thermal_time <- 0.0; 		// accumulated heat units since sowing, drives growth stage transitions    
+    float thermal_time <- 0.0; 		// accumulated heat units since sowing, drives growth stage transitions
     float growth_stage <- 0.0;		// how far along the crop is from 0 (just sown) to 1 (mature), used for display only
     float pest_yield_loss <- 0.0; 	// running total of biomass lost to pest damage across the season, in g/m2
     float k_pest <- 1.0; 		// damage multiplier on daily growth, ranges from min_k_pest to 1.0
@@ -582,7 +1003,7 @@ species Crop {
         // daily thermal time increment: how many degrees above the base temperature today was
         // if t_mean is below Tbase, dTT is 0 - the crop does not develop on cold days
         float dTT <- max(0.0, t_mean - Tbase);
-        thermal_time <- thermal_time + dTT; 	// add today's heat units to the running total  
+        thermal_time <- thermal_time + dTT; 	// add today's heat units to the running total
         growth_stage <- min(1.0, thermal_time / maturity_threshold);	// growth_stage is just thermal_time scaled to [0, 1] for display purposes
     }
 
@@ -590,7 +1011,7 @@ species Crop {
     // GROW REFLEX
     // runs every cycle to compute biomass gained today after pest damage is applied
     reflex grow {
-    
+
         // select fAPAR based on current growth stage
         // fAPAR is the fraction of solar radiation the canopy intercepts
         // it increases as the canopy develops and slightly drops at maturity
@@ -612,7 +1033,7 @@ species Crop {
         // read pest_load from the plot this crop is growing on
         // if somehow the crop has no plot, assume zero pest pressure
         float plot_pest_load <- (myPlot = nil) ? 0.0 : myPlot.pest_load;
-        
+
         // compute the damage multiplier for today
         // higher pest_load and higher stage_weight both reduce k_pest
         // min_k_pest sets a floor so growth never drops to zero
@@ -620,14 +1041,14 @@ species Crop {
 
         // what the crop would have grown today with no pest pressure
         float daily_growth_potential <- potential_rue * solar_rad * fAPAR;
-        
+
         // what the crop actually grew today after pest damage
         float daily_growth_actual <- daily_growth_potential * k_pest;
-        
+
         // the difference is logged as pest-attributable yield loss
         // accumulates across the whole season and is reported at harvest
         pest_yield_loss <- pest_yield_loss + (daily_growth_potential - daily_growth_actual);
-        
+
         // add today's actual growth to total biomass
         biomass <- biomass + daily_growth_actual;
     }
@@ -639,15 +1060,15 @@ species Crop {
 // neighbors: 8 means each plot connects to its 8 surrounding neighbors (Moore, includes diagonals)
 // ===========================================================================
 grid Plot width: 10 height: 10 neighbors: 8 {
-    
+
     Crop associated_crop <- nil;	// the crop currently growing on this plot, nil if the plot is fallow
-    bool pending_sow <- true;		// flag that tells the plot to sow a new crop on the next cycle    
+    bool pending_sow <- true;		// flag that tells the plot to sow a new crop on the next cycle
     float pest_load <- 0.0;			// current pest pressure on this plot, normalized between 0 (none) and 1 (maximum)
-    
+
     // temporary buffer that holds incoming pest from neighbors during diffusion
     // committed to pest_load at the end of each cycle in pest_step pass 3
     float pest_load_tmp <- 0.0;
-    
+
     // fraction of the local pest population that is resistant to etofenprox
     // increases only when etofenprox is sprayed on this plot
     float rf_etofenprox <- 0.0;
@@ -659,7 +1080,7 @@ grid Plot width: 10 height: 10 neighbors: 8 {
     // For starfarm: max(rf_etofenprox, rf_neonicotinoid).
     // For a specific compound: <own_RF> + rf_other * spillover_k.
     float resistant_fraction <- 0.0;
-    
+
     // how many days have passed since the last spray on this plot
     // used to enforce the spray cooldown
     int days_since_last_spray <- 0;
@@ -694,9 +1115,9 @@ grid Plot width: 10 height: 10 neighbors: 8 {
     }
 
     // SOW CROP REFLEX
-    // fires when pending_sow is true — creates a new crop and resets plot state for the new season
+    // fires when pending_sow is true; creates a new crop and resets plot state for the new season
     reflex sow_crop when: pending_sow {
-    
+
         // reset pest and spray state at the start of each season
         pest_load <- 0.0;
         days_since_last_spray <- 0;
@@ -708,18 +1129,18 @@ grid Plot width: 10 height: 10 neighbors: 8 {
             plot_strategy  <- farmer_strategy;
             plot_pesticide <- pesticide_choice;
         }
-        
+
         // if localized infection is on and this is the outbreak center,
         // seed it with an initial pest load instead of starting clean
         if (localized_infection and grid_x = outbreak_cx and grid_y = outbreak_cy) {
             pest_load <- outbreak_seed;
         }
-        
+
         // create a new crop agent and attach it to this plot
         create Crop returns: c;
         associated_crop <- first(c);
         ask associated_crop { myPlot <- myself; }
-        
+
         // clear the flag so this reflex does not fire again until the next season
         pending_sow <- false;
     }
@@ -748,10 +1169,10 @@ grid Plot width: 10 height: 10 neighbors: 8 {
     aspect field {
         rgb c <- rgb(120, 90, 60);  // default: bare soil for fallow plots
         if (associated_crop != nil) {
-            if      (pest_load < 0.1)  { c <- rgb(0, 112, 48); }     // dark green  — healthy, low pressure
-            else if (pest_load <= 0.4) { c <- rgb(198, 239, 206); }  // light green — mild pressure
-            else if (pest_load <= 0.7) { c <- rgb(255, 255, 0); }    // yellow      — moderate pressure
-            else                      { c <- rgb(88, 57, 39); }     // brown       — severe, crop overwhelmed
+            if      (pest_load < 0.1)  { c <- rgb(0, 112, 48); }     // dark green: healthy, low pressure
+            else if (pest_load <= 0.4) { c <- rgb(198, 239, 206); }  // light green: mild pressure
+            else if (pest_load <= 0.7) { c <- rgb(255, 255, 0); }    // yellow: moderate pressure
+            else                      { c <- rgb(88, 57, 39); }     // brown: severe, crop overwhelmed
         }
         draw shape color: c border: rgb(255, 255, 255, 0.35);
     }
@@ -775,10 +1196,10 @@ species Bph skills: [moving] {
     // CRAWL REFLEX
     // moves the sprite around randomly within its home plot each cycle
     reflex crawl {
-    
+
         // wander randomly with a wide turning angle so movement looks natural
         do wander speed: speed amplitude: 110.0;
-        
+
         // if the sprite has drifted too far from its plot center, snap it back
         // this prevents sprites from visually crossing into neighboring plots
         if (home != nil and (self.location distance_to home.location) > 14.0) {
@@ -788,20 +1209,20 @@ species Bph skills: [moving] {
 
     // DEFAULT ASPECT
     // draws the sprite as a small rectangle (body) with a circle (head) pointing in the direction of movement
-    // no image asset is used — the shape is drawn directly in code
+    // no image asset is used; the shape is drawn directly in code
     aspect default {
-    
+
         // body color shifts from red to orange as the host plot's resistant_fraction increases
         // this makes resistance buildup visible at a glance without reading the chart
         // if the sprite has no home plot for some reason, default to plain red
 		rgb body <- (home = nil) ? rgb(139, 90, 43) : rgb(139 - int(129 * home.resistant_fraction), 90 - int(85 * home.resistant_fraction), 43 - int(40 * home.resistant_fraction));
-        
+
         // compute head position slightly ahead of the body in the direction of travel
         point head_pos <- location + {cos(heading) * 1.6, sin(heading) * 1.6};
-        
+
         // draw the body as a rotated rectangle aligned to the heading
         draw rectangle(3.0, 1.4) color: body border: rgb(60, 0, 0) rotate: heading;
-        
+
         // draw the head as a small circle at the front of the body
         draw circle(0.9) at: head_pos color: body border: rgb(60, 0, 0);
     }
@@ -827,7 +1248,7 @@ species Farmer {
     reflex decide_spray {
 
         ask Plot where (each.associated_crop != nil) {
-        
+
             // check if enough days have passed since the last spray
             bool cooldown_ok <- days_since_last_spray >= spray_cooldown;
             bool should_spray <- false;
@@ -846,7 +1267,7 @@ species Farmer {
             }
 
             if (should_spray) {
-            
+
                 float pest_before <- pest_load; // snapshot pest_load before spraying for the console log
 
                 // active compound's efficacy, selection_pressure, and cost.
@@ -863,7 +1284,7 @@ species Farmer {
                         active_cost <- pc.cost;
                     }
                 }
-                
+
                 // ---- Per-compound resistance ratchet ----
                 // Each compound has its own resistant_fraction pool (rf_etofenprox,
                 // rf_neonicotinoid). Sprays increment only their own pool.
@@ -909,18 +1330,18 @@ species Farmer {
 
                 // realized efficacy is reduced by effective resistance
                 float realized_efficacy <- active_efficacy * (1.0 - effective_rf);
-                
+
                 // apply the spray: reduce pest_load by the realized efficacy fraction
                 pest_load <- pest_load * (1.0 - realized_efficacy);
-                
-                days_since_last_spray <- 0;		// reset the cooldown counter     
+
+                days_since_last_spray <- 0;		// reset the cooldown counter
                 spray_count <- spray_count + 1;		// increment this plot's spray count for the season
                 lifetime_spray_count <- lifetime_spray_count + 1;	// increment this plot's spray count across all seasons
                 myself.money <- myself.money - active_cost;	// deduct spray cost from the farmer's money, compound-specific
-                
+
                 // flag that a spray happened this cycle, used by the events chart
                 spray_event <- 1;
-                
+
                 // log spray details to the console
                 if (not batch_mode) {
                 write "  -> Spray on plot " + grid_x + "," + grid_y + " day " + cycle
@@ -938,7 +1359,7 @@ species Farmer {
 // EXPERIMENT
 // ===========================================================================
 experiment pest_spatial type: gui {
-	
+
     parameter "t_mean (deg C)"               var: t_mean              min: 20.0  max: 40.0;
     parameter "solar_rad (MJ/m2/day)"        var: solar_rad           min: 5.0   max: 30.0;
     parameter "humidity (%)"                 var: humidity            min: 50.0  max: 100.0;
@@ -961,6 +1382,7 @@ experiment pest_spatial type: gui {
     parameter "diffusion_prop"               var: diffusion_prop      min: 0.0   max: 0.5;
     parameter "selection_pressure_constant"  var: selection_pressure_constant min: 0.0 max: 0.5;
     parameter "immigration_rate (0=no decay)" var: immigration_rate   min: 0.0   max: 1.0;
+    parameter "resistance_fitness_cost (0=no decay)" var: resistance_fitness_cost min: 0.0 max: 0.5;
     parameter "Cross-resistance spillover (0=none, 1=full)" var: spillover_k min: 0.0 max: 1.0;
     parameter "Localized infection (centre source)" var: localized_infection;
     parameter "outbreak_seed (centre start load)"   var: outbreak_seed min: 0.0 max: 1.0;
@@ -1076,8 +1498,10 @@ experiment Batch_Harvest_Grid type: batch repeat: 40 keep_seed: false until: sea
 // ===========================================================================
 // SWEEP: calendar interval and pesticide threshold, phase_2-native.
 // Same question as the phase_1 sweep, but resistant_fraction is tracked here
-// directly rather than combined from separate experiments. max_seasons bumped
-// from 3 to 6 for enough resistance buildup to read a real trend.
+// directly rather than combined from separate experiments. Runs the full 30
+// seasons so cumulative profit is comparable to every other 30-season condition
+// in the Summary ranking table (tab3_Results.md), not just early yield.
+// keep_seed:false means results vary slightly (~0.01-0.015 t/ha) run to run.
 // Each experiment writes its own dedicated CSV.
 // ===========================================================================
 experiment Sweep_CalendarInterval_Grid type: batch repeat: 40 keep_seed: false until: season > max_seasons {
@@ -1085,7 +1509,7 @@ experiment Sweep_CalendarInterval_Grid type: batch repeat: 40 keep_seed: false u
     parameter "Batch mode"           var: batch_mode             among: [true];
     parameter "Interval sweep mode"  var: interval_sweep_mode    among: [true];
     parameter "calendar_interval"    var: calendar_interval      among: [1, 3, 5, 7, 10, 14, 21, 28];
-    parameter "Seasons to simulate"  var: max_seasons            among: [6];
+    parameter "Seasons to simulate"  var: max_seasons            among: [30];
 
     init {
         save "run_id,strategy,calendar_interval,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
@@ -1094,11 +1518,14 @@ experiment Sweep_CalendarInterval_Grid type: batch repeat: 40 keep_seed: false u
 }
 
 experiment Sweep_Threshold_Grid type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    // Same reasoning as Sweep_CalendarInterval_Grid above: runs the full 30
+    // seasons so cumulative profit is comparable to every other entry in the
+    // Summary ranking table.
     parameter "Strategy"             var: farmer_strategy        among: ["threshold"];
     parameter "Batch mode"           var: batch_mode             among: [true];
     parameter "Threshold sweep mode" var: threshold_sweep_mode   among: [true];
     parameter "pesticide_threshold"  var: pesticide_threshold    among: [0.1, 0.2, 0.3, 0.4, 0.5];
-    parameter "Seasons to simulate"  var: max_seasons            among: [6];
+    parameter "Seasons to simulate"  var: max_seasons            among: [30];
 
     init {
         save "run_id,strategy,pesticide_threshold,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
@@ -1207,10 +1634,8 @@ experiment Batch_Rotation_Grid type: batch repeat: 40 keep_seed: false until: se
     parameter "Seasons to simulate"  var: max_seasons           among: [30];
 
     init {
-        // seed season 1 with compound A so rotation starts correctly from the first spray
-        // without this, season 1 would use the global default ("starfarm") until the
-        // first harvest fires the season-boundary flip.
-        pesticide_choice <- rotation_compound_a;
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
         save "run_id,strategy,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
              to: "harvest_grid_output_rotation.csv" format: "text" rewrite: true;
     }
@@ -1279,4 +1704,444 @@ experiment Sweep_Immigration_Rate type: batch repeat: 40 keep_seed: false until:
              to: "sensitivity_output_immigration_grid.csv" format: "text" rewrite: true;
     }
 }
-	
+
+// ===========================================================================
+// Extended immigration sweep, high range (0.30-1.00). Separate CSV from
+// Sweep_Immigration_Rate so the existing 0.0-0.20 data is preserved;
+// concatenate for the full range (0.0 to 1.00) when analyzing with
+// analyze_grid.py.
+// ===========================================================================
+experiment Sweep_Immigration_Rate_Extended type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"                         var: farmer_strategy              among: ["calendar"];
+    parameter "Pesticide"                        var: pesticide_choice             among: ["starfarm"];
+    parameter "Batch mode"                       var: batch_mode                   among: [true];
+    parameter "Immigration sweep mode (ext.)"    var: sweep_immigration_mode_extended among: [true];
+    parameter "Seasons to simulate"              var: max_seasons                  among: [30];
+    parameter "immigration_rate"                 var: immigration_rate             among: [0.30, 0.50, 0.70, 0.90, 1.00];
+
+    init {
+        save "run_id,strategy,immigration_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_immigration_grid_extended.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Resistance decay (fitness cost) sweep. New mechanism, separate from
+// immigration_rate (see resistance_fitness_cost comment in global{}, grounded in
+// Yu et al. 2018's density-pressure fitness-cost finding). immigration_rate held
+// at its default (0.05) so the decay term's effect is isolated, looking for a
+// long-term stability "sweet spot" (season-to-season profit stability).
+// Crosses both calendar and threshold strategy with resistance_fitness_cost
+// (10 conditions total), not just calendar alone, so the decay term's effect
+// can be compared across strategies. parallel: false, per the standing rule
+// for any experiment logging incrementally to a shared CSV.
+// ===========================================================================
+experiment Sweep_ResistanceDecay_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                  var: farmer_strategy         among: ["calendar", "threshold"];
+    parameter "Pesticide"                 var: pesticide_choice        among: ["starfarm"];
+    parameter "Batch mode"                var: batch_mode              among: [true];
+    parameter "Decay sweep mode"          var: sweep_decay_mode        among: [true];
+    parameter "Seasons to simulate"       var: max_seasons             among: [30];
+    parameter "immigration_rate"          var: immigration_rate        among: [0.05];
+    parameter "resistance_fitness_cost"   var: resistance_fitness_cost among: [0.0, 0.01, 0.02, 0.05, 0.10];
+
+    init {
+        save "run_id,strategy,resistance_fitness_cost,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_decay_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Rotation x calendar_interval sweep. Repeats the Sweep_CalendarInterval_Grid
+// question ("how many days") but with rotation_mode=true instead of a fixed
+// compound. Runs 30 seasons (matches Batch_Rotation_Grid), since the long-term
+// rotation benefit (delayed fixation to ~S8) only shows up over a longer
+// horizon. CSV logs pesticide_choice per row since rotation flips it each
+// season.
+// ===========================================================================
+experiment Sweep_CalendarInterval_Grid_Rotation type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"                       var: farmer_strategy             among: ["calendar"];
+    parameter "Batch mode"                     var: batch_mode                  among: [true];
+    parameter "Rotation mode"                  var: rotation_mode               among: [true];
+    parameter "Interval sweep mode (rotation)" var: interval_sweep_mode_rotation among: [true];
+    parameter "Compound A (odd)"               var: rotation_compound_a         among: ["etofenprox"];
+    parameter "Compound B (even)"              var: rotation_compound_b         among: ["neonicotinoid"];
+    parameter "immigration_rate"               var: immigration_rate            among: [0.05];
+    parameter "calendar_interval"              var: calendar_interval           among: [1, 3, 5, 7, 10, 14, 21, 28];
+    parameter "Seasons to simulate"            var: max_seasons                 among: [30];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
+        save "run_id,strategy,calendar_interval,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_interval_grid_rotation.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Rotation x pesticide_threshold sweep. Same reasoning as the interval sweep
+// above, but for the threshold strategy.
+// ===========================================================================
+experiment Sweep_Threshold_Grid_Rotation type: batch repeat: 40 keep_seed: false until: season > max_seasons {
+    parameter "Strategy"                        var: farmer_strategy              among: ["threshold"];
+    parameter "Batch mode"                      var: batch_mode                   among: [true];
+    parameter "Rotation mode"                   var: rotation_mode                among: [true];
+    parameter "Threshold sweep mode (rotation)" var: threshold_sweep_mode_rotation among: [true];
+    parameter "Compound A (odd)"                var: rotation_compound_a          among: ["etofenprox"];
+    parameter "Compound B (even)"               var: rotation_compound_b          among: ["neonicotinoid"];
+    parameter "immigration_rate"                var: immigration_rate             among: [0.05];
+    parameter "pesticide_threshold"             var: pesticide_threshold          among: [0.1, 0.2, 0.3, 0.4, 0.5];
+    parameter "Seasons to simulate"             var: max_seasons                  among: [30];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
+        save "run_id,strategy,pesticide_threshold,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_threshold_grid_rotation.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Compound-sequence exploration. Generalizes rotation beyond strict A-B
+// alternation to find whether a different fixed season-by-season compound
+// sequence, or a non-deterministic reactive rule, beats plain rotation on
+// long-term profit. Doubles as a farmer-adaptation sketch (the "REACTIVE"
+// pattern is a real, if simple, adaptive policy).
+//
+// Pattern space: every distinct, non-constant, period<=4 binary sequence over
+// {A=etofenprox, B=neonicotinoid} whose minimal period equals its length (so
+// e.g. "ABAB" is excluded, since it is identical in effect to period-2 "AB",
+// already covered): 2 period-2 + 6 period-3 + 12 period-4 = 20 patterns,
+// plus "REACTIVE" (spray whichever pool has the lower grid-mean RF that
+// season). 21 conditions total.
+//
+// repeat=20 (not the usual 40): this is a screening sweep across 21 conditions
+// per strategy (42 conditions total across both experiments below); halving
+// repeat keeps total runtime manageable while still giving a reasonable
+// per-condition mean. Rerun at repeat=40 for whichever pattern(s) come out on
+// top, if tighter confidence is needed.
+//
+// Analysis: use analyze_grid.py (extended with --profit) to rank patterns by
+// cumulative 30-season net profit AND season-to-season profit stability, both
+// reported side by side with no single metric picked in advance.
+// ===========================================================================
+experiment Sweep_CompoundSequence_Grid_Calendar type: batch repeat: 20 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                var: farmer_strategy   among: ["calendar"];
+    parameter "Batch mode"              var: batch_mode        among: [true];
+    parameter "Rotation mode"           var: rotation_mode     among: [true];
+    parameter "Sequence sweep mode"     var: sequence_sweep_mode_calendar among: [true];
+    parameter "Compound A"              var: rotation_compound_a among: ["etofenprox"];
+    parameter "Compound B"              var: rotation_compound_b among: ["neonicotinoid"];
+    parameter "immigration_rate"        var: immigration_rate  among: [0.05];
+    parameter "Seasons to simulate"     var: max_seasons       among: [30];
+    parameter "rotation_pattern"        var: rotation_pattern  among: [
+        "AB", "BA",
+        "AAB", "ABA", "ABB", "BAA", "BAB", "BBA",
+        "AAAB", "AABA", "AABB", "ABAA", "ABBA", "ABBB",
+        "BAAA", "BAAB", "BABB", "BBAA", "BBAB", "BBBA",
+        "REACTIVE"
+    ];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there (each per-experiment init{} runs
+        // before that instance's swept parameters are bound, so seeding here
+        // instead of in this block is what makes rotation_pattern read correctly).
+        save "run_id,strategy,rotation_pattern,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_compound_sequence_grid_calendar.csv" format: "text" rewrite: true;
+    }
+}
+
+experiment Sweep_CompoundSequence_Grid_Threshold type: batch repeat: 20 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                var: farmer_strategy   among: ["threshold"];
+    parameter "Batch mode"              var: batch_mode        among: [true];
+    parameter "Rotation mode"           var: rotation_mode     among: [true];
+    parameter "Sequence sweep mode"     var: sequence_sweep_mode_threshold among: [true];
+    parameter "Compound A"              var: rotation_compound_a among: ["etofenprox"];
+    parameter "Compound B"              var: rotation_compound_b among: ["neonicotinoid"];
+    parameter "immigration_rate"        var: immigration_rate  among: [0.05];
+    parameter "Seasons to simulate"     var: max_seasons       among: [30];
+    parameter "rotation_pattern"        var: rotation_pattern  among: [
+        "AB", "BA",
+        "AAB", "ABA", "ABB", "BAA", "BAB", "BBA",
+        "AAAB", "AABA", "AABB", "ABAA", "ABBA", "ABBB",
+        "BAAA", "BAAB", "BABB", "BBAA", "BBAB", "BBBA",
+        "REACTIVE"
+    ];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
+        save "run_id,strategy,rotation_pattern,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_compound_sequence_grid_threshold.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Interval/threshold x immigration_rate cross-sweeps. Answers "spray-delay
+// threshold as a function of dilution rate": neither Sweep_CalendarInterval_Grid
+// (fixes immigration_rate=0.05) nor Sweep_Immigration_Rate_Extended (fixes the
+// interval at its default) crosses spray timing with dilution rate directly.
+// Single compound (starfarm/Default), no rotation -- kept simple to isolate the
+// interval/threshold x immigration_rate interaction on its own.
+//
+// immigration_rate levels: 0.05 (current model default), 0.20 (the "notable
+// delay" point from Sweep_Immigration_Rate), 0.40 and 0.70 (mid/high, inside
+// the range Sweep_Immigration_Rate_Extended showed prevents fixation entirely
+// under calendar at default interval -- this sweep checks whether that still
+// holds once interval/threshold also varies).
+//
+// repeat=15 (lower than the repeat=20 used for the compound-sequence sweep):
+// this crosses 8 intervals x 4 immigration rates = 32 conditions (interval
+// experiment) and 5 thresholds x 4 immigration rates = 20 conditions
+// (threshold experiment). Screening sweeps; rerun any decision-relevant
+// condition at repeat=40 for tighter confidence.
+// ===========================================================================
+experiment Sweep_Interval_Immigration_Grid type: batch repeat: 15 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                    var: farmer_strategy             among: ["calendar"];
+    parameter "Pesticide"                   var: pesticide_choice            among: ["starfarm"];
+    parameter "Batch mode"                  var: batch_mode                  among: [true];
+    parameter "Interval x immigration mode" var: interval_immigration_sweep_mode among: [true];
+    parameter "calendar_interval"           var: calendar_interval           among: [1, 3, 5, 7, 10, 14, 21, 28];
+    parameter "immigration_rate"            var: immigration_rate            among: [0.05, 0.20, 0.40, 0.70];
+    parameter "Seasons to simulate"         var: max_seasons                 among: [30];
+
+    init {
+        save "run_id,strategy,calendar_interval,immigration_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_interval_immigration_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+experiment Sweep_Threshold_Immigration_Grid type: batch repeat: 15 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                     var: farmer_strategy              among: ["threshold"];
+    parameter "Pesticide"                    var: pesticide_choice             among: ["starfarm"];
+    parameter "Batch mode"                   var: batch_mode                   among: [true];
+    parameter "Threshold x immigration mode" var: threshold_immigration_sweep_mode among: [true];
+    parameter "pesticide_threshold"          var: pesticide_threshold          among: [0.1, 0.2, 0.3, 0.4, 0.5];
+    parameter "immigration_rate"             var: immigration_rate             among: [0.05, 0.20, 0.40, 0.70];
+    parameter "Seasons to simulate"          var: max_seasons                  among: [30];
+
+    init {
+        save "run_id,strategy,pesticide_threshold,immigration_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_threshold_immigration_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Combined farmer adaptation. Answers "can REACTIVE and strategy-level
+// switching run together?" -- yes: REACTIVE (rotation_mode=true,
+// rotation_pattern="REACTIVE") decides pesticide_choice each season boundary;
+// adaptive_profit_mode independently decides whether/how hard to keep spraying
+// (calendar_interval / pesticide_threshold), via a monotonic backoff triggered
+// when this season's Farmer.money delta falls short of the season before's.
+// Profit-triggered (not resistance-triggered), matching the project's
+// profit-maximization priority; continuous backoff (not a categorical
+// calendar<->threshold<->none swap).
+// 2x2x2 factorial: farmer_strategy x adaptive_profit_mode x rotation_mode
+// (REACTIVE on/off). rotation_pattern is fixed to "REACTIVE" -- irrelevant
+// when rotation_mode=false, since the whole rotation update block is skipped
+// and pesticide_choice stays at its single global default (Default/starfarm).
+// ===========================================================================
+experiment Sweep_AdaptiveFarmer_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                   var: farmer_strategy            among: ["calendar", "threshold"];
+    parameter "Batch mode"                 var: batch_mode                 among: [true];
+    parameter "Adaptive farmer sweep mode" var: adaptive_farmer_sweep_mode among: [true];
+    parameter "Adaptive profit backoff"    var: adaptive_profit_mode       among: [true, false];
+    parameter "Rotation mode (REACTIVE)"   var: rotation_mode              among: [true, false];
+    parameter "rotation_pattern"           var: rotation_pattern           among: ["REACTIVE"];
+    parameter "Compound A"                 var: rotation_compound_a        among: ["etofenprox"];
+    parameter "Compound B"                 var: rotation_compound_b        among: ["neonicotinoid"];
+    parameter "immigration_rate"           var: immigration_rate           among: [0.05];
+    parameter "Seasons to simulate"        var: max_seasons                among: [30];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        save "run_id,strategy,adaptive_profit_mode,rotation_reactive,calendar_interval,pesticide_threshold,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_adaptive_farmer_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Sweep_AdaptiveFarmer_Grid above only tests backoff at the default
+// immigration_rate (0.05). Does backoff still add value once immigration_rate
+// is already substantial enough to help resistance on its own, or is its
+// benefit specific to the low-immigration regime this model has mostly been
+// calibrated against? rotation_mode pinned false throughout (no REACTIVE) to
+// isolate the backoff mechanism alone; strategy pinned to calendar, where
+// backoff's effect is cleanest. 2x4 factorial (8 conditions). parallel: false,
+// per the standing rule for any experiment that logs incrementally per-row to
+// a shared CSV.
+// ===========================================================================
+experiment Sweep_AdaptiveFarmer_Immigration_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                          var: farmer_strategy                     among: ["calendar"];
+    parameter "Batch mode"                        var: batch_mode                          among: [true];
+    parameter "Adaptive farmer x immigration mode" var: adaptive_farmer_immigration_sweep_mode among: [true];
+    parameter "Adaptive profit backoff"           var: adaptive_profit_mode                among: [true, false];
+    parameter "Rotation mode"                     var: rotation_mode                       among: [false];
+    parameter "immigration_rate"                  var: immigration_rate                    among: [0.05, 0.20, 0.40, 0.70];
+    parameter "Seasons to simulate"                var: max_seasons                         among: [30];
+
+    init {
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        save "run_id,strategy,adaptive_profit_mode,immigration_rate,calendar_interval,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_adaptive_farmer_immigration_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// The main Adaptive Farmer Sweep found calendar + REACTIVE + backoff never
+// reaches RF=0.99 within 30 seasons at the default immigration_rate (final
+// RF=0.825, still climbing at S30). That result is ambiguous on its own: does
+// it genuinely plateau below fixation, or does it just take longer than 30
+// seasons to get there? This experiment runs that single standout condition
+// alone, at n=40 (confirmatory, not a screening sweep) and max_seasons=60
+// (double the original horizon), to tell the difference. Every parameter
+// below is pinned to a single value (not swept),
+// so this is a pure replication run for statistical confidence at a longer
+// horizon, not a factorial. Own dedicated gate + CSV, does not touch
+// sensitivity_output_adaptive_farmer_grid.csv.
+// ===========================================================================
+experiment Sweep_AdaptiveFarmer_LongHorizon type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                  var: farmer_strategy                  among: ["calendar"];
+    parameter "Batch mode"                var: batch_mode                       among: [true];
+    parameter "Long-horizon confirm mode" var: adaptive_farmer_longhorizon_mode among: [true];
+    parameter "Adaptive profit backoff"   var: adaptive_profit_mode             among: [true];
+    parameter "Rotation mode (REACTIVE)"  var: rotation_mode                    among: [true];
+    parameter "rotation_pattern"          var: rotation_pattern                 among: ["REACTIVE"];
+    parameter "Compound A"                var: rotation_compound_a              among: ["etofenprox"];
+    parameter "Compound B"                var: rotation_compound_b              among: ["neonicotinoid"];
+    parameter "immigration_rate"          var: immigration_rate                 among: [0.05];
+    parameter "Seasons to simulate"       var: max_seasons                      among: [60];
+
+    init {
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        save "run_id,strategy,adaptive_profit_mode,rotation_reactive,calendar_interval,pesticide_threshold,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_adaptive_farmer_longhorizon.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Does backoff's benefit generalize to plain, fixed A/B rotation, not just
+// REACTIVE's adaptive compound choice? The main Adaptive Farmer Sweep only
+// crosses backoff with REACTIVE; this crosses it with the simpler mechanism
+// tested standalone in Batch_Rotation_Grid instead. 2x2 factorial (backoff x
+// plain-rotation), strategy pinned to calendar (where backoff's effect is
+// cleanest), same 30-season horizon as the original factorial, for direct
+// comparability.
+// ===========================================================================
+experiment Sweep_AdaptiveFarmer_Rotation_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                     var: farmer_strategy                    among: ["calendar"];
+    parameter "Batch mode"                   var: batch_mode                         among: [true];
+    parameter "Backoff x rotation sweep mode" var: adaptive_farmer_rotation_sweep_mode among: [true];
+    parameter "Adaptive profit backoff"      var: adaptive_profit_mode               among: [true, false];
+    parameter "Rotation mode (plain AB)"     var: rotation_mode                      among: [true, false];
+    parameter "rotation_pattern"             var: rotation_pattern                   among: ["AB"];
+    parameter "Compound A"                   var: rotation_compound_a                among: ["etofenprox"];
+    parameter "Compound B"                   var: rotation_compound_b                among: ["neonicotinoid"];
+    parameter "immigration_rate"             var: immigration_rate                   among: [0.05];
+    parameter "Seasons to simulate"          var: max_seasons                        among: [30];
+
+    init {
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        save "run_id,strategy,adaptive_profit_mode,rotation_mode,calendar_interval,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_adaptive_farmer_rotation_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Mirror of Sweep_AdaptiveFarmer_Grid above, testing the escalation hypothesis
+// instead of backoff. Literature review (farmer behavior under perceived
+// pesticide resistance) found real farmers often respond to declining
+// performance by spraying MORE, not less -- this experiment tests that
+// alternative directly under the same factorial structure, so results are
+// directly comparable row-for-row against the backoff sweep.
+// 2x2x2 factorial: farmer_strategy x adaptive_escalate_mode x rotation_mode
+// (REACTIVE on/off).
+// ===========================================================================
+experiment Sweep_AdaptiveFarmer_Escalate_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                     var: farmer_strategy              among: ["calendar", "threshold"];
+    parameter "Batch mode"                   var: batch_mode                   among: [true];
+    parameter "Adaptive escalate sweep mode" var: adaptive_escalate_sweep_mode among: [true];
+    parameter "Adaptive profit escalation"   var: adaptive_escalate_mode       among: [true, false];
+    parameter "Rotation mode (REACTIVE)"     var: rotation_mode                among: [true, false];
+    parameter "rotation_pattern"             var: rotation_pattern             among: ["REACTIVE"];
+    parameter "Compound A"                   var: rotation_compound_a          among: ["etofenprox"];
+    parameter "Compound B"                   var: rotation_compound_b          among: ["neonicotinoid"];
+    parameter "immigration_rate"             var: immigration_rate             among: [0.05];
+    parameter "Seasons to simulate"          var: max_seasons                  among: [30];
+
+    init {
+        // season-1 pesticide_choice seeding handled centrally in the model's
+        // global init -- see comment there.
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        save "run_id,strategy,adaptive_escalate_mode,rotation_reactive,calendar_interval,pesticide_threshold,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_adaptive_farmer_escalate_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Categorical strategy-swap mechanism: a bigger follow-up to backoff/
+// escalation. Where backoff/escalation adjust *how hard* the farmer sprays
+// within one strategy, this swaps the farmer's whole strategy family --
+// calendar -> threshold -> none -> calendar -- when triggered. Two trigger
+// definitions, tested as two separate experiments (not composed): profit-based
+// (mirrors backoff/escalation's trigger) and resistance-based (tab4 Section 3
+// sketch: "if resistant_fraction > 0.5, switch"). Reversible cycle, no
+// cap/floor -- a farmer can complete a full loop back to their starting
+// strategy if the trigger keeps firing. Standalone: not crossed with
+// rotation/REACTIVE and not composed with adaptive_profit_mode/
+// adaptive_escalate_mode, to keep the comparison clean (same reasoning as
+// keeping escalation separate from backoff). "none" is included as a starting
+// strategy alongside calendar/threshold: a farmer who starts by not spraying
+// can still get pulled into the cycle once yield-loss profit or resistance
+// (via others' diffusion) crosses the trigger, so it is a meaningful
+// condition, not a dead one.
+// ===========================================================================
+experiment Sweep_StrategySwap_Profit_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                       var: farmer_strategy                   among: ["calendar", "threshold", "none"];
+    parameter "Batch mode"                     var: batch_mode                        among: [true];
+    parameter "Strategy swap sweep mode"       var: strategyswap_profit_sweep_mode    among: [true];
+    parameter "Strategy swap (profit trigger)" var: adaptive_strategyswap_profit_mode among: [true, false];
+    parameter "immigration_rate"               var: immigration_rate                  among: [0.05];
+    parameter "Seasons to simulate"            var: max_seasons                       among: [30];
+
+    init {
+        last_season_money <- 0.0;
+        prev_season_profit <- 0.0;
+        strategyswap_count <- 0;
+        save "run_id,strategy,adaptive_strategyswap_profit_mode,adaptive_strategyswap_resistance_mode,strategyswap_count,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_strategyswap_grid_profit.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Mirror of Sweep_StrategySwap_Profit_Grid above, using the resistance-
+// threshold trigger (tab4 Section 3 sketch) instead of profit. Separate
+// output file from the profit-trigger experiment (both trigger-mode booleans
+// are still logged per row, for a clean header, but the two experiments' own
+// rewrite:true inits would otherwise collide on a shared file -- same
+// reasoning as the compound-sequence calendar/threshold split), same column
+// shape.
+// ===========================================================================
+experiment Sweep_StrategySwap_Resistance_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                           var: farmer_strategy                       among: ["calendar", "threshold", "none"];
+    parameter "Batch mode"                         var: batch_mode                            among: [true];
+    parameter "Strategy swap sweep mode"           var: strategyswap_resistance_sweep_mode    among: [true];
+    parameter "Strategy swap (resistance trigger)" var: adaptive_strategyswap_resistance_mode among: [true, false];
+    parameter "strategyswap_resistance_threshold"  var: strategyswap_resistance_threshold     among: [0.5];
+    parameter "immigration_rate"                   var: immigration_rate                      among: [0.05];
+    parameter "Seasons to simulate"                var: max_seasons                            among: [30];
+
+    init {
+        strategyswap_count <- 0;
+        save "run_id,strategy,adaptive_strategyswap_profit_mode,adaptive_strategyswap_resistance_mode,strategyswap_count,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_strategyswap_grid_resistance.csv" format: "text" rewrite: true;
+    }
+}

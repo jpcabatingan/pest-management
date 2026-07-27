@@ -343,7 +343,7 @@ species Plot {
 
         // log harvest summary to harvest_output.csv, one row per season per run.
         // excluded from sweep runs (sweep_mode/interval_sweep_mode/threshold_sweep_mode)
-        // so sweep experiments don't also pollute this file.
+        // so sweep experiments do not also pollute this file.
         if (batch_mode and not sweep_mode and not interval_sweep_mode and not threshold_sweep_mode) {
             float end_money <- empty(Farmer) ? 0.0 : first(Farmer).money;
             string hrow <- "" + run_id + "," + farmer_strategy + "," + season + ","
@@ -618,7 +618,7 @@ experiment Sweep_Pesticide_Neonicotinoid type: batch repeat: 40 keep_seed: false
 }
 
 // ===========================================================================
-// SWEEP: spray_cost sensitivity sweep — bracket 50/150 around the default of 100.
+// SWEEP: spray_cost sensitivity sweep; bracket 50/150 around the default of 100.
 // Spray_cost does not change spray decisions (threshold/calendar do not check cost),
 // but changes net profit outcomes for a fixed spray pattern. Phase 1 has no resistance
 // ratchet, so profit differences across cost levels are purely financial, not behavioral.

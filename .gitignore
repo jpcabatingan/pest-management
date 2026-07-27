@@ -1,0 +1,9 @@
+# Generated experiment output (regenerate by re-running the GAML experiments).
+# Kept out of git: many of these exceed GitHub's 100MB per-file limit.
+# Actual copies live in ../pest-management-data/ (outside this repo).
+Pest-Management-Module/models/*.csv
+Pest-Management-Module/models/07052026/*.csv
+
+# Python build artifacts
+__pycache__/
+*.pyc
