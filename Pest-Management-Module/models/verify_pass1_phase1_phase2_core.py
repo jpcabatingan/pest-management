@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Verify all tables in tab3_Results.md against actual CSV output files."""
+"""Audit pass 1 of 4: verify tab3_Results.md against CSV output files.
+Covers Phase 1, Phase 2 (baseline), and Phase 2 Rotation tables.
+See verify_pass2/3/4 for the remaining sections."""
 import pandas as pd
 import sys
 

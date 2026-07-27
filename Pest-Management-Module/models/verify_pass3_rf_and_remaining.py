@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Deep-check the RF discrepancy and verify remaining tables."""
+"""Audit pass 3 of 4: verify tab3_Results.md against CSV output files.
+Deep-checks a resistant_fraction discrepancy, plus Rotation x Interval
+grain, Phase 1 sensitivity sweep, 3-compound baseline, threshold/calendar
+grid RF tables, and profit lead."""
 import pandas as pd
 
 GRAIN_PRICE = 3000.0

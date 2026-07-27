@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Verify remaining tables: rotation x threshold, compound-sequence, cross-sweep, heterogeneous, summary ranking."""
+"""Audit pass 2 of 4: verify tab3_Results.md against CSV output files.
+Covers Rotation x Threshold, Compound-Sequence, Interval x Immigration
+cross-sweep, Heterogeneous Landscape, and the Summary Ranking table."""
 import pandas as pd
 
 GRAIN_PRICE = 3000.0

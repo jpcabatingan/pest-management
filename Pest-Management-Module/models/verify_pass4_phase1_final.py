@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Final comprehensive check of all remaining tables."""
+"""Audit pass 4 of 4 (final): verify tab3_Results.md against CSV output
+files. Covers Phase 1 baseline, Phase 1 net profit, and the sensitivity
+sweep's per-season grain and spray-count std tables."""
 import pandas as pd
 
 GRAIN_PRICE = 3000.0
