@@ -260,6 +260,13 @@ global {
     // be isolated.
     bool   sweep_decay_mode <- false;  // true only in Sweep_ResistanceDecay_Grid
 
+    // ---- Pest reproduction sweep gate ----
+    // Tests sensitivity to pest_growth_rate, the other hard-to-evaluate pest
+    // parameter alongside immigration_rate. pest_growth_rate is otherwise held
+    // fixed at its literature-derived value (Win et al. 2011) in every experiment
+    // in this file; this is the first one that varies it.
+    bool   sweep_reproduction_mode <- false;  // true only in Sweep_PestGrowthRate_Grid
+
     // ---- Interval/threshold x immigration_rate sweep gates ----
     // Answers "spray-delay threshold as a function of dilution rate": neither
     // existing sweep crosses spray timing with immigration_rate directly.
@@ -276,6 +283,14 @@ global {
     // Answers "how many days, what threshold, under rotation."
     bool   interval_sweep_mode_rotation  <- false;  // true only in Sweep_CalendarInterval_Grid_Rotation
     bool   threshold_sweep_mode_rotation <- false;  // true only in Sweep_Threshold_Grid_Rotation
+
+    // ---- Rotation x immigration_rate sweep gate ----
+    // Batch_Rotation_Grid only ever ran at immigration_rate=0.05. Answers "does
+    // rotation's fixation delay still hold once immigration is already doing
+    // most of the work on its own, or only at the low-immigration default."
+    // Same 8-value immigration_rate list as the interval/threshold x immigration
+    // sweeps below, so all three can be compared on the same footing.
+    bool   rotation_immigration_sweep_mode <- false;  // true only in Sweep_Rotation_Immigration_Grid
 
     // ---- Adaptive farmer: profit-triggered backoff + REACTIVE compound choice ----
     // Answers "can we do both REACTIVE and strategy-level switching?" -- yes, they are
@@ -601,7 +616,7 @@ global {
 	            // log long-term run summary: same shape as harvest_grid_output.csv plus
 	            // pesticide_choice column so one CSV covers all 3 compounds
 	            string ltrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
-	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	                         + grain_tha + "," + pest_load + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
 	            save ltrow to: "harvest_grid_output_longterm.csv" format: "text" rewrite: false;
 
 	        } else if (interval_sweep_mode_rotation) {
@@ -618,6 +633,14 @@ global {
 	            string trrow <- "" + run_id + "," + farmer_strategy + "," + pesticide_threshold + "," + pesticide_choice + "," + season + "," + grid_x + "," + grid_y + ","
 	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
 	            save trrow to: "sensitivity_output_threshold_grid_rotation.csv" format: "text" rewrite: false;
+
+	        } else if (rotation_immigration_sweep_mode) {
+	            // log rotation x immigration_rate sweep: pesticide_choice + immigration_rate
+	            // both recorded. Checked before the plain rotation_mode branch, same
+	            // reasoning as the interval/threshold x rotation branches above.
+	            string rirow <- "" + run_id + "," + farmer_strategy + "," + pesticide_choice + "," + immigration_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save rirow to: "sensitivity_output_rotation_immigration_grid.csv" format: "text" rewrite: false;
 
 	        } else if (sequence_sweep_mode_calendar or sequence_sweep_mode_threshold) {
 	            // log compound-sequence sweep: rotation_pattern + pesticide_choice
@@ -769,6 +792,14 @@ global {
 	            string decrow <- "" + run_id + "," + farmer_strategy + "," + resistance_fitness_cost + "," + season + "," + grid_x + "," + grid_y + ","
 	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
 	            save decrow to: "sensitivity_output_decay_grid.csv" format: "text" rewrite: false;
+
+	        } else if (sweep_reproduction_mode) {
+	            // log pest reproduction (pest_growth_rate) sweep: each row includes
+	            // pest_growth_rate so its effect on fixation timing/profit can be compared
+	            // against the immigration_rate sweep on the same axes.
+	            string reprow <- "" + run_id + "," + farmer_strategy + "," + pest_growth_rate + "," + season + "," + grid_x + "," + grid_y + ","
+	                         + grain_tha + "," + yield_loss_tha + "," + spray_count + "," + resistant_fraction + "," + logged_cost + "\n";
+	            save reprow to: "sensitivity_output_reproduction_grid.csv" format: "text" rewrite: false;
 
 	        } else if (interval_immigration_sweep_mode) {
 	            // log interval x immigration_rate cross-sweep: both swept columns
@@ -1611,7 +1642,7 @@ experiment Batch_LongTerm_Grid type: batch repeat: 40 keep_seed: false until: se
     parameter "Seasons to simulate" var: max_seasons    among: [30];
 
     init {
-        save "run_id,strategy,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+        save "run_id,strategy,pesticide_choice,season,plot_x,plot_y,grain_tha,pest_load,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
              to: "harvest_grid_output_longterm.csv" format: "text" rewrite: true;
     }
 }
@@ -1752,6 +1783,29 @@ experiment Sweep_ResistanceDecay_Grid type: batch repeat: 40 keep_seed: false pa
 }
 
 // ===========================================================================
+// Pest reproduction (pest_growth_rate) sensitivity sweep. Mirrors
+// Sweep_ResistanceDecay_Grid: immigration_rate held at default (0.05) so the
+// reproduction term's effect is isolated. Range brackets the literature
+// estimate (0.033038, Win et al. 2011) from 0 (no density-dependent growth,
+// flat increment only) to roughly 3x baseline. Crosses calendar and threshold
+// strategies. parallel: false, per the standing rule for shared-CSV logging.
+// ===========================================================================
+experiment Sweep_PestGrowthRate_Grid type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                var: farmer_strategy        among: ["calendar", "threshold"];
+    parameter "Pesticide"               var: pesticide_choice       among: ["starfarm"];
+    parameter "Batch mode"              var: batch_mode             among: [true];
+    parameter "Reproduction sweep mode" var: sweep_reproduction_mode among: [true];
+    parameter "Seasons to simulate"     var: max_seasons            among: [30];
+    parameter "immigration_rate"        var: immigration_rate       among: [0.05];
+    parameter "pest_growth_rate"        var: pest_growth_rate       among: [0.0, 0.0165, 0.033038, 0.05, 0.10];
+
+    init {
+        save "run_id,strategy,pest_growth_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_reproduction_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
 // Rotation x calendar_interval sweep. Repeats the Sweep_CalendarInterval_Grid
 // question ("how many days") but with rotation_mode=true instead of a fixed
 // compound. Runs 30 seasons (matches Batch_Rotation_Grid), since the long-term
@@ -1885,17 +1939,18 @@ experiment Sweep_CompoundSequence_Grid_Threshold type: batch repeat: 20 keep_see
 // Single compound (starfarm/Default), no rotation -- kept simple to isolate the
 // interval/threshold x immigration_rate interaction on its own.
 //
-// immigration_rate levels: 0.05 (current model default), 0.20 (the "notable
-// delay" point from Sweep_Immigration_Rate), 0.40 and 0.70 (mid/high, inside
-// the range Sweep_Immigration_Rate_Extended showed prevents fixation entirely
-// under calendar at default interval -- this sweep checks whether that still
-// holds once interval/threshold also varies).
+// immigration_rate levels: 8 values spanning 0.05-0.90 (0.05 = current model
+// default, 0.10/0.20/0.30/0.40/0.50 fill out the mid range, 0.70/0.90 cover
+// the high range where Sweep_Immigration_Rate_Extended showed fixation can be
+// prevented entirely under calendar at the default interval -- this sweep
+// checks whether that still holds once interval/threshold also varies).
+// 8 intervals/thresholds x 8 immigration rates fills the full grid (64 cells
+// for interval, 40 for threshold), and both experiments share the same
+// immigration_rate list so they can be compared on the same footing.
 //
 // repeat=15 (lower than the repeat=20 used for the compound-sequence sweep):
-// this crosses 8 intervals x 4 immigration rates = 32 conditions (interval
-// experiment) and 5 thresholds x 4 immigration rates = 20 conditions
-// (threshold experiment). Screening sweeps; rerun any decision-relevant
-// condition at repeat=40 for tighter confidence.
+// screening sweeps; rerun any decision-relevant condition at repeat=40 for
+// tighter confidence.
 // ===========================================================================
 experiment Sweep_Interval_Immigration_Grid type: batch repeat: 15 keep_seed: false parallel: false until: season > max_seasons {
     parameter "Strategy"                    var: farmer_strategy             among: ["calendar"];
@@ -1903,7 +1958,7 @@ experiment Sweep_Interval_Immigration_Grid type: batch repeat: 15 keep_seed: fal
     parameter "Batch mode"                  var: batch_mode                  among: [true];
     parameter "Interval x immigration mode" var: interval_immigration_sweep_mode among: [true];
     parameter "calendar_interval"           var: calendar_interval           among: [1, 3, 5, 7, 10, 14, 21, 28];
-    parameter "immigration_rate"            var: immigration_rate            among: [0.05, 0.20, 0.40, 0.70];
+    parameter "immigration_rate"            var: immigration_rate            among: [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.70, 0.90];
     parameter "Seasons to simulate"         var: max_seasons                 among: [30];
 
     init {
@@ -1918,12 +1973,39 @@ experiment Sweep_Threshold_Immigration_Grid type: batch repeat: 15 keep_seed: fa
     parameter "Batch mode"                   var: batch_mode                   among: [true];
     parameter "Threshold x immigration mode" var: threshold_immigration_sweep_mode among: [true];
     parameter "pesticide_threshold"          var: pesticide_threshold          among: [0.1, 0.2, 0.3, 0.4, 0.5];
-    parameter "immigration_rate"             var: immigration_rate             among: [0.05, 0.20, 0.40, 0.70];
+    parameter "immigration_rate"             var: immigration_rate             among: [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.70, 0.90];
     parameter "Seasons to simulate"          var: max_seasons                  among: [30];
 
     init {
         save "run_id,strategy,pesticide_threshold,immigration_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
              to: "sensitivity_output_threshold_immigration_grid.csv" format: "text" rewrite: true;
+    }
+}
+
+// ===========================================================================
+// Rotation x immigration_rate sweep. Batch_Rotation_Grid only ever ran at
+// immigration_rate=0.05 -- never tested against elevated immigration. Uses
+// the same 8-value immigration_rate list as the interval/threshold x
+// immigration sweeps above so all three are directly comparable. All 3
+// strategies (matches Batch_Rotation_Grid), fixed A/B alternation (not
+// REACTIVE -- that combination is covered separately by the Adaptive Farmer
+// sweeps). repeat=15, screening sweep, parallel:false (shared CSV).
+// ===========================================================================
+experiment Sweep_Rotation_Immigration_Grid type: batch repeat: 15 keep_seed: false parallel: false until: season > max_seasons {
+    parameter "Strategy"                     var: farmer_strategy              among: ["none", "calendar", "threshold"];
+    parameter "Batch mode"                   var: batch_mode                   among: [true];
+    parameter "Rotation mode"                var: rotation_mode                among: [true];
+    parameter "Rotation x immigration mode"  var: rotation_immigration_sweep_mode among: [true];
+    parameter "Compound A (odd)"             var: rotation_compound_a          among: ["etofenprox"];
+    parameter "Compound B (even)"            var: rotation_compound_b          among: ["neonicotinoid"];
+    parameter "immigration_rate"             var: immigration_rate             among: [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.70, 0.90];
+    parameter "Seasons to simulate"          var: max_seasons                  among: [30];
+
+    init {
+        // season-1 pesticide_choice seeding now handled centrally in the model's
+        // global init -- see comment there.
+        save "run_id,strategy,pesticide_choice,immigration_rate,season,plot_x,plot_y,grain_tha,pest_loss_tha,spray_count,resistant_fraction,cost_per_spray\n"
+             to: "sensitivity_output_rotation_immigration_grid.csv" format: "text" rewrite: true;
     }
 }
 
@@ -1995,14 +2077,14 @@ experiment Sweep_AdaptiveFarmer_Immigration_Grid type: batch repeat: 40 keep_see
 // ===========================================================================
 // The main Adaptive Farmer Sweep found calendar + REACTIVE + backoff never
 // reaches RF=0.99 within 30 seasons at the default immigration_rate (final
-// RF=0.825, still climbing at S30). That result is ambiguous on its own: does
-// it genuinely plateau below fixation, or does it just take longer than 30
-// seasons to get there? This experiment runs that single standout condition
-// alone, at n=40 (confirmatory, not a screening sweep) and max_seasons=60
-// (double the original horizon), to tell the difference. Every parameter
-// below is pinned to a single value (not swept),
-// so this is a pure replication run for statistical confidence at a longer
-// horizon, not a factorial. Own dedicated gate + CSV, does not touch
+// RF=0.825, still climbing at S30). The first run of this experiment (60
+// seasons) confirmed the climb continues rather than plateauing: RF went
+// 0.826 -> 0.955 with no sign of leveling off by S60. Still ambiguous
+// whether it genuinely never fixates or just needs more seasons -- extended
+// to max_seasons=120 (double the 60-season horizon) to find out. Every
+// parameter below is pinned to a single value (not swept), so this is a
+// pure replication run for statistical confidence at a longer horizon, not
+// a factorial. Own dedicated gate + CSV, does not touch
 // sensitivity_output_adaptive_farmer_grid.csv.
 // ===========================================================================
 experiment Sweep_AdaptiveFarmer_LongHorizon type: batch repeat: 40 keep_seed: false parallel: false until: season > max_seasons {
@@ -2015,7 +2097,7 @@ experiment Sweep_AdaptiveFarmer_LongHorizon type: batch repeat: 40 keep_seed: fa
     parameter "Compound A"                var: rotation_compound_a              among: ["etofenprox"];
     parameter "Compound B"                var: rotation_compound_b              among: ["neonicotinoid"];
     parameter "immigration_rate"          var: immigration_rate                 among: [0.05];
-    parameter "Seasons to simulate"       var: max_seasons                      among: [60];
+    parameter "Seasons to simulate"       var: max_seasons                      among: [120];
 
     init {
         last_season_money <- 0.0;
